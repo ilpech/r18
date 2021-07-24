@@ -45,6 +45,12 @@ class SearchGUIParser:
             prots_peptides_data = df_sheet['#Validated Peptides']
             prots_uniq_peptides_data = df_sheet['#Validated Unique Peptides']
             prots_inference_data = df_sheet['Protein Inference']
+            confident_coverage_data = df_sheet['Confident Coverage [%]']
+            nsaf_ppm_data = df_sheet['Spectrum Counting NSAF [ppm]']
+            empai_ppm_data = df_sheet['Spectrum Counting emPAI [ppm]']
+            nsaf_fmol_data = df_sheet['Spectrum Counting NSAF [fmol]']
+            empai_fmol_data = df_sheet['Spectrum Counting emPAI [fmol]']
+            mw_kda_data = df_sheet['MW [kDa]']
         except KeyError as e:
             print(e)
             raise Exception('check you searchGUI report')
@@ -55,10 +61,7 @@ class SearchGUIParser:
             if 'Related' in prots_inference_data[i]:
                 ids2del.append(i)
                 continue
-            if prots_confidence_data[i] < 1:
-                ids2del.append(i)
-                continue
-            if prots_chromosome_data[i] != 18:
+            if prots_confidence_data[i] < 10:
                 ids2del.append(i)
                 continue
         for i in range(len(df_sheet)):
@@ -72,15 +75,22 @@ class SearchGUIParser:
                     prots_descrs_data[i],
                     prots_sec_accs_data[i],
                     prots_peptides_data[i],
-                    prots_uniq_peptides_data[i]
+                    prots_uniq_peptides_data[i],
+                    confident_coverage_data[i],
+                    nsaf_ppm_data[i],
+                    empai_ppm_data[i],
+                    nsaf_fmol_data[i],
+                    empai_fmol_data[i],
+                    mw_kda_data[i]
                 )
             )
 
             
-        # for prot in proteins:
-            # print(prot.protein_group)
-        print(len(ids2del))
-        print(len(df_sheet))
+        for prot in proteins:
+            print()
+            print(prot.protein_group)
+            print(prot.spectrum_data.asnp())
+            print()
         print(len(proteins))
 
 if __name__ == '__main__':
