@@ -7,10 +7,11 @@ from tools import readSearchXlsxReport
 #          https://www.biorxiv.org/content/10.1101/2020.11.04.358739v2.full.pdf
 # 2. prot – https://pubs.acs.org/doi/10.1021/acs.jproteome.0c00856
 #           https://pubmed.ncbi.nlm.nih.gov/33202127/
+#    supporting_info(data): https://pubs.acs.org/doi/10.1021/acs.jproteome.0c00856?goto=supporting-info
+# 3. попросить аккаунт с доступом к статьям от нии
 
 
-
-data_path = '/Users/ilpech/repositories/r18/data/liver_hepg2'
+data_path = '../data/liver_hepg2'
 rna_file_path = 'rna_liver_hepg2_13_20_no_header.xlsx'
 prot_1D = 'prot_1D_analysis.xlsx'
 prot_2D = 'prot_2D_analysis.xlsx'
