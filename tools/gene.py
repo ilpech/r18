@@ -31,13 +31,16 @@ class Gene:
         self.nextprot_status = None
         self.peptide_seq = None
         
+    def id(self):
+        return self.id_uniprot
+        
     def addProteinAbundanceReport(
         self,
         prot1D,
         prot2D
     ):
-        prot_1d_names = prot_1D[' PI (Uniprot)']
-        prot_2d_names = prot_2D['PI (Uniprot)']
+        prot_1d_names = prot1D[' PI (Uniprot)']
+        prot_2d_names = prot2D['PI (Uniprot)']
         copies_column = 'Copies of protein per cell'
         prot_1d_id = [i for i in range(len(prot_1d_names)) if prot_1d_names[i] == self.id_uniprot]
         prot_2d_id = [i for i in range(len(prot_1d_names)) if prot_2d_names[i] == self.id_uniprot]
@@ -45,16 +48,16 @@ class Gene:
             print('error while trying to find protein1D with id {}'.format(self.id_uniprot))
         else:
             prot_1d_id = prot_1d_id[0]
-            self.protein_copies_per_cell_1D = prot_1D[copies_column][prot_1d_id]
+            self.protein_copies_per_cell_1D = prot1D[copies_column][prot_1d_id]
         if len(prot_2d_id) == 0:
             print('error while trying to find protein2D with id {}'.format(self.id_uniprot))
         else:
             prot_2d_id = prot_2d_id[0]
-            self.protein_copies_per_cell_2D = prot_2D[copies_column][prot_2d_id]
+            self.protein_copies_per_cell_2D = prot2D[copies_column][prot_2d_id]
     
     def addRNAReport(self, rna_data):
-        gene_names = rna_data['GeneNames']
-        gene_id = [i for i in range(len(uniprot_ac)) if uniprot_ac[i] == self.id_uniprot]
+        gene_names = rna_data['Uniprot AC']
+        gene_id = [i for i in range(len(gene_names)) if gene_names[i] == self.id_uniprot]
         if len(gene_id) == 0:
             raise Exception('error while trying to find rna with id {}'.format(self.id_uniprot))
         gene_id = gene_id[0]

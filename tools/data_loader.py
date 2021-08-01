@@ -31,3 +31,11 @@ class DataLoader:
                             help='path to gene ids description'
                             )
         return parser.parse_args()
+    
+    def __init__(self):
+        opt = self._get_argparse()
+        self.prot1D_path = opt.prot1D
+        self.prot2D_path = opt.prot2D
+        self.rna_path = opt.rna
+        self.ion_path = opt.ionData
+        self.gene_ids_path = opt.geneIds
