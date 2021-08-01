@@ -2,20 +2,23 @@ import os
 from tools import readSearchXlsxReport
 from gene import Gene
 from typing import List
-from gene_mapping import uniprot_mapping_header, mapping2dict
+from gene_mapping import (
+    uniprot_mapping_header, 
+    mapping2dict,
+    rewrite_mapping_with_ids
+)
 # уточнить ссылки на статьи
 # 1. rna – https://www.biorxiv.org/content/10.1101/2020.11.04.358739v2.full.pdf
 # 2. prot – https://pubs.acs.org/doi/10.1021/acs.jproteome.0c00856
 #    supporting_info(data): https://pubs.acs.org/doi/10.1021/acs.jproteome.0c00856?goto=supporting-info
 # 3. попросить аккаунт с доступом к статьям от нии
+# 4 https://www.ebi.ac.uk/proteins/api/doc/
 
-print('reading mapping...')
-genes_mapping = mapping2dict('../data/liver_hepg2/HUMAN_9606_idmapping_selected.tab.gz')
-print('...reading mapping')
 data_path = '../data/liver_hepg2'
 rna_file_path = 'rna_liver_hepg2_13_20_no_header.xlsx'
 prot_1D_n = 'prot_1D_analysis.xlsx'
 prot_2D_n = 'prot_2D_analysis.xlsx'
+mapping_path = '../data/liver_hepg2/human_18chr_gene_mapping.tag'
 rna_data = readSearchXlsxReport(
     os.path.join(data_path, rna_file_path),
     'Chr18_data'
@@ -29,7 +32,11 @@ prot_2D = readSearchXlsxReport(
     'Лист1'
 )
 print(len(rna_data), len(prot_1D), len(prot_2D))
-uniprot_ac = rna_data['Uniprot AC']
+uniprot_ac = [x for x in rna_data['Uniprot AC']]
+
+print('reading mapping...')
+genes_mapping = mapping2dict(mapping_path)
+print('...reading mapping')
 genes : List[Gene] = []
 for gene_id in uniprot_ac:
     gene = Gene(gene_id)
@@ -45,11 +52,11 @@ for gene in genes:
     print(gene.nextprot_status)
     print(gene.peptide_seq)
     print(gene.chromosome_pos)
-    # print('rna experiments:: len::', len(gene.rna_measurements))
-    # for m,v in gene.rna_measurements.items():
-    #     print(m, '::', v)
-    # print('gene.protein_copies_per_cell_1D', gene.protein_copies_per_cell_1D)
-    # print('gene.protein_copies_per_cell_2D', gene.protein_copies_per_cell_2D)
+    print('rna experiments:: len::', len(gene.rna_measurements))
+    for m,v in gene.rna_measurements.items():
+        print(m, '::', v)
+    print('gene.protein_copies_per_cell_1D', gene.protein_copies_per_cell_1D)
+    print('gene.protein_copies_per_cell_2D', gene.protein_copies_per_cell_2D)
     print('GO keywords::')
     print(genes_mapping[gene.id()]['GO'])
     print('Ensembl keywords::')

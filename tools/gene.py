@@ -46,11 +46,13 @@ class Gene:
         prot_2d_id = [i for i in range(len(prot_1d_names)) if prot_2d_names[i] == self.id_uniprot]
         if len(prot_1d_id) == 0:
             print('error while trying to find protein1D with id {}'.format(self.id_uniprot))
+            self.protein_copies_per_cell_2D = -1
         else:
             prot_1d_id = prot_1d_id[0]
             self.protein_copies_per_cell_1D = prot1D[copies_column][prot_1d_id]
         if len(prot_2d_id) == 0:
             print('error while trying to find protein2D with id {}'.format(self.id_uniprot))
+            self.protein_copies_per_cell_1D = -1
         else:
             prot_2d_id = prot_2d_id[0]
             self.protein_copies_per_cell_2D = prot2D[copies_column][prot_2d_id]
@@ -77,7 +79,10 @@ class Gene:
         for k,_ in rna_data.items():
             for s in search_sustrs:
                 if s in k:
-                    self.rna_measurements[k] = rna_data[k][gene_id]
+                    m_out = rna_data[k][gene_id]
+                    if isinstance(m_out, str):
+                        m_out = -1.0
+                    self.rna_measurements[k] = m_out
                     break
 
 if __name__ == '__main__':
