@@ -64,10 +64,15 @@ for gene in genes:
 
 print('\n============ OVERALL')
 print('genes', len(genes))
-with_prot1D = len([x for x in genes if x.protein_copies_per_cell_1D is not None])
-with_prot2D = len([x for x in genes if x.protein_copies_per_cell_2D is not None])
-with_prot1D2D = len([x for x in genes if x.protein_copies_per_cell_1D is not None and 
-                        x.protein_copies_per_cell_2D is not None])
+
+missing = len([x for x in genes if 'Missing' in x.nextprot_status])
+proteinLevel = len([x for x in genes if 'Protein Level' in x.nextprot_status])
+with_prot1D = len([x for x in genes if x.protein_copies_per_cell_1D != -1 and x.nextprot_status != 'Missing'])
+with_prot2D = len([x for x in genes if x.protein_copies_per_cell_2D != -1 and x.nextprot_status != 'Missing'])
+with_prot1D2D = len([x for x in genes if ((x.protein_copies_per_cell_1D != -1 and 
+                        x.protein_copies_per_cell_2D != -1) and 'Missing' not in x.nextprot_status)])
+print('proteinLevel', proteinLevel)
+print('missing', missing)
 print('with_prot1D', with_prot1D)
 print('with_prot2D', with_prot2D)
 print('with_prot1D2D', with_prot1D2D)
