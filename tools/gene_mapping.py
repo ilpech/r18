@@ -28,7 +28,7 @@ def uniprot_mapping_header():
     ]
 
 def mapping2dict(path):
-    with gzip.open(path, 'rt') as f:
+    with open(path, 'r') as f:
         data = f.readlines()
     databases = uniprot_mapping_header()
     out = {}
@@ -42,6 +42,29 @@ def mapping2dict(path):
                 main_name = database_splt[0]
         out[main_name] = data
     return out
+
+def rewrite_mapping_with_ids(
+    path, 
+    uniprot_ids,
+    outpath
+):
+    with gzip.open(path, 'rt') as f:
+        data = f.readlines()
+    lines_ids2remain = []
+    databases = uniprot_mapping_header()
+    for line_id in range(len(data)):
+        splt = data[line_id].split('\t')
+        for i in range(len(databases)):
+            database_splt = splt[i].replace(';', '').split()
+            if i == 0:
+                main_name = database_splt[0]
+                if main_name in uniprot_ids:
+                    lines_ids2remain.append(line_id)
+    new_data = [data[i] for i in range(len(data)) if i in lines_ids2remain]
+    with open(outpath, 'w') as f:
+        f.writelines(new_data)
+    print('remapping written in ', outpath)
+                    
 
 
 if __name__ == '__main__':
