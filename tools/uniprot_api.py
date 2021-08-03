@@ -3,7 +3,7 @@ import json
 
 def getGene(uniprot_id):
     params = {
-        'accession': uniprot_id,
+        'gene': uniprot_id,
         'chromosome': 18
     }
     requestURL = "https://www.ebi.ac.uk/proteins/api/coordinates"

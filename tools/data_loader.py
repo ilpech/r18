@@ -3,7 +3,7 @@ import mxnet as mx
 import numpy as np
 import argparse
 from tools import boolean_string, readSearchXlsxReport
-from gene_mapping import mapping2dict
+from gene_mapping import mapping2dict, uniprot_mapping_header
 from typing import List
 from gene import Gene
 
