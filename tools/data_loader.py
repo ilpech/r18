@@ -1,8 +1,10 @@
+# python3 data_loader.py --rna ../data/liver_hepg2/rna_liver_hepg2_13_20_no_header.xlsx --prot1D ../data/liver_hepg2/prot_1D_analysis.xlsx --prot2D ../data/liver_hepg2/prot_2D_analysis.xlsx --geneMapping ../data/liver_hepg2/human_18chr_gene_mapping.tab --ionData ../data/liver_hepg2/prot_ion_data.xlsx
+
 import os
 import mxnet as mx
 import numpy as np
 import argparse
-from tools import boolean_string, readSearchXlsxReport
+from tools import str2bool, readSearchXlsxReport
 from gene_mapping import mapping2dict, uniprot_mapping_header
 from typing import List
 from gene import Gene
@@ -34,18 +36,33 @@ class DataLoader:
                             help='path to gene ids description'
                             )
         parser.add_argument(
-                            '--skipMissing', type=boolean_string, default=True,
-                            help='path to gene ids description'
+                            '--skipMissing', type=str2bool, default=True,
+                            help='skip genes with nd'
                             )
         return parser.parse_args()
     
-    def __init__(self):
-        opt = self._get_argparse()
-        self.prot1D_path = opt.prot1D
-        self.prot2D_path = opt.prot2D
-        self.rna_path = opt.rna
-        self.ion_path = opt.ionData
-        self.gene_mapping_path = opt.geneMapping
+    @staticmethod
+    def opt_from_config(config_path):
+        import yaml
+        with open(config_path) as c:
+            return yaml.load(c)['data']
+    
+    def __init__(self, config_path):
+        self.config_path = config_path
+        if len(self.config_path) == 0:
+            opt = self._get_argparse()
+            self.prot1D_path = opt.prot1D
+            self.prot2D_path = opt.prot2D
+            self.rna_path = opt.rna
+            self.ion_path = opt.ionData
+            self.gene_mapping_path = opt.geneMapping
+        else:
+            opt = DataLoader.opt_from_config(self.config_path)
+            self.prot1D_path = opt['prot1D']
+            self.prot2D_path = opt['prot2D']
+            self.rna_path = opt['rna']
+            self.ion_path = opt['ionData']
+            self.gene_mapping_path = opt['geneMapping']
         print('reading rna ', self.rna_path)
         self.rna_data = readSearchXlsxReport(
             self.rna_path,
@@ -93,6 +110,6 @@ class DataLoader:
             print(self.mapping[gene.id()]['Ensembl'])
 
 if __name__ == '__main__':
-    dataloader = DataLoader()
+    dataloader = DataLoader('../config/dense_train.yaml')
     dataloader.info()
         

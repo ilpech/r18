@@ -8,6 +8,28 @@ import subprocess
 import cv2
 from mxnet import gluon, nd, image
 from mxnet.gluon.loss import Loss, _apply_weighting, _reshape_like
+import numpy as np
+
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+def denorm_shifted_log(data):
+    if is_number(data):
+        if data <= 0:
+            return data
+        return np.exp(float(data))-1
+    raise ValueError("norm_shifted_log::not a number {}".format(data))
+
+def norm_shifted_log(data):
+    if is_number(data):
+        if data <= 0:
+            return data
+        return np.log(float(data) + 1)
+    raise ValueError("norm_shifted_log::not a number {}".format(data))
 
 class SoftmaxOutputCrossEntropyLoss(Loss):
     r"""Computes the softmax cross entropy loss for network with softmax out
@@ -155,7 +177,7 @@ def ensure_folder(dir_fname):
             return False
     return True
 
-def boolean_string(s):
+def str2bool(s):
     if s not in {'False', 'True'}:
         raise ValueError('Not a valid boolean string, use False or True')
     return s == 'True'

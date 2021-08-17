@@ -1,0 +1,27 @@
+data:
+  rna: ../data/liver_hepg2/rna_liver_hepg2_13_20_no_header.xlsx
+  prot1D: ../data/liver_hepg2/prot_1D_analysis.xlsx
+  prot2D: ../data/liver_hepg2/prot_2D_analysis.xlsx 
+  geneMapping: ../data/liver_hepg2/human_18chr_gene_mapping.tab 
+  ionData: ../data/liver_hepg2/prot_ion_data.xlsx
+  skipMissing: False
+train:
+  epochs: 900
+  log_interval: 2
+  wd: 0.0001
+  momentum: 0.9
+  optimizer: sgd
+  lr:
+    0: 0.1
+    50: 0.01
+    100: 0.001
+  batch_size:
+    0: 128
+    100: 64
+  augm:
+    isEnabled: True
+    epoch_p:
+      0: 0.99
+      10: 0.8
+
+  
