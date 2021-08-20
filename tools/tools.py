@@ -256,7 +256,7 @@ class Softmax(mx.gluon.nn.HybridBlock):
 def readSearchXlsxReport(file_path, sheet_name=''):
     file_abs_path = os.path.abspath(file_path)
     print('readSearchGUIReport::reading data at::', file_abs_path)
-    df_sheet_all = pd.read_excel(file_path, sheet_name=None)
+    df_sheet_all = pd.read_excel(file_path, sheet_name=None, engine='openpyxl')
     if len(sheet_name) != 0:
         try:
             return df_sheet_all[sheet_name]

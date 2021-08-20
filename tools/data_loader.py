@@ -63,6 +63,7 @@ class DataLoader:
             self.rna_path = opt['rna']
             self.ion_path = opt['ionData']
             self.gene_mapping_path = opt['geneMapping']
+        self.genes_mapping_databases = uniprot_mapping_header()
         print('reading rna ', self.rna_path)
         self.rna_data = readSearchXlsxReport(
             self.rna_path,
@@ -80,7 +81,7 @@ class DataLoader:
         )
         print('reading mapping', self.gene_mapping_path)
         self.mapping = mapping2dict(self.gene_mapping_path)
-        self.gene_ids = [x for x in self.rna_data['Uniprot AC']]
+        self.gene_ids = [x for x in self.rna_data['Uniprot AC'] if isinstance(x, str)]
         self.genes: List[Gene] = []
         for gene_id in self.gene_ids:
             gene = Gene(gene_id)
@@ -89,8 +90,36 @@ class DataLoader:
                 self.prot1D_data,
                 self.prot2D_data
             )
-            print('gene ', gene.id_uniprot, ' added')
             self.genes.append(gene)
+    
+    def dataFromMappingDatabase(self, db_name, gene_name):
+        '''
+        db_name should exitst in self.genes_mapping_databases
+        '''
+        return self.mapping[gene_name][db_name]
+    
+    def geneMappingDatabases(self, gene_name):
+        return self.geneMappingDatabases[gene_name]
+    
+    def mappingDatabaseToOneHot(self, db_name):
+        uniq_data = []
+        genes_data = []
+        for i in range(len(self.genes)):
+            db_gene_data = self.dataFromMappingDatabase(db_name, self.genes[i].id_uniprot)
+            genes_data.append(db_gene_data)
+            for data in db_gene_data:
+                if data not in uniq_data:
+                    uniq_data.append(data)
+        genes_onehot_vectors = [[0] * len(uniq_data)] * len(self.genes)
+        npa = np.array(genes_onehot_vectors)
+        sorted_uniq = sorted(uniq_data)
+        for i in range(len(genes_data)):
+            for j in range(len(sorted_uniq)):
+                found = [x for x in genes_data[i] if x == sorted_uniq[j]]
+                if len(found) > 0:
+                    npa[i][j] = 1
+        print('mappingDatabaseToOneHot::{}::found shape {}'.format(db_name, npa.shape))
+        return npa
     
     def info(self):
         for gene in self.genes:
@@ -111,5 +140,12 @@ class DataLoader:
 
 if __name__ == '__main__':
     dataloader = DataLoader('../config/dense_train.yaml')
-    dataloader.info()
+    dataloader.mappingDatabaseToOneHot('GI')
+    dataloader.mappingDatabaseToOneHot('GO')
+    dataloader.mappingDatabaseToOneHot('PubMed')
+    dataloader.mappingDatabaseToOneHot('MIM')
+    dataloader.mappingDatabaseToOneHot('RefSeq')
+    # for gene in dataloader.genes:
+        # print(dataloader.dataFromMappingDatabase('RefSeq', gene.id_uniprot))
+    # dataloader.info()
         

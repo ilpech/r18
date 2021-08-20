@@ -45,13 +45,13 @@ class Gene:
         prot_1d_id = [i for i in range(len(prot_1d_names)) if prot_1d_names[i] == self.id_uniprot]
         prot_2d_id = [i for i in range(len(prot_1d_names)) if prot_2d_names[i] == self.id_uniprot]
         if len(prot_1d_id) == 0:
-            print('error while trying to find protein1D with id {}'.format(self.id_uniprot))
+            # print('error while trying to find protein1D with id {}'.format(self.id_uniprot))
             self.protein_copies_per_cell_2D = -1
         else:
             prot_1d_id = prot_1d_id[0]
             self.protein_copies_per_cell_1D = prot1D[copies_column][prot_1d_id]
         if len(prot_2d_id) == 0:
-            print('error while trying to find protein2D with id {}'.format(self.id_uniprot))
+            # print('error while trying to find protein2D with id {}'.format(self.id_uniprot))
             self.protein_copies_per_cell_1D = -1
         else:
             prot_2d_id = prot_2d_id[0]

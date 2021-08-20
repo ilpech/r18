@@ -18,7 +18,7 @@ data_path = '../data/liver_hepg2'
 rna_file_path = 'rna_liver_hepg2_13_20_no_header.xlsx'
 prot_1D_n = 'prot_1D_analysis.xlsx'
 prot_2D_n = 'prot_2D_analysis.xlsx'
-mapping_path = '../data/liver_hepg2/human_18chr_gene_mapping.tag'
+mapping_path = '../data/liver_hepg2/human_18chr_gene_mapping.tab'
 rna_data = readSearchXlsxReport(
     os.path.join(data_path, rna_file_path),
     'Chr18_data'

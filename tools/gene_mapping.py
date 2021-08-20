@@ -68,7 +68,7 @@ def rewrite_mapping_with_ids(
 
 
 if __name__ == '__main__':
-    out = mapping2dict('../data/liver_hepg2/HUMAN_9606_idmapping_selected.tab.gz')
+    out = mapping2dict('../data/liver_hepg2/human_18chr_gene_mapping.tab')
     for gene, databases in out.items():
         print('gene name', gene)
         for db, values in databases.items():

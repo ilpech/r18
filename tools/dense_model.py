@@ -11,6 +11,8 @@ class DenseProteinPredectionNet(HybridBlock):
         self.dense1 = nn.Dense(channels, 'relu')
         self.bn2 = nn.BatchNorm()
         self.dense2 = nn.Dense(channels, 'relu')
+        self.bn3 = nn.BatchNorm()
+        self.dense3 = nn.Dense(channels, 'relu')
         self.droprate = drop_rate
         self.features_to_addWeight = nn.HybridSequential(prefix='')
         self.features_to_addWeight.add(nn.GlobalAvgPool2D())
@@ -20,7 +22,6 @@ class DenseProteinPredectionNet(HybridBlock):
         self.features_to_mulWeight.add(nn.GlobalAvgPool2D())
         self.features_to_mulWeight.add(nn.Flatten())
         self.features_to_mulWeight.add(nn.Dense(1))
-        # self.out.add(nn.Dense(1))
         self.out = nn.Dense(1)
 
     def hybrid_forward(self, F, x):
@@ -31,6 +32,8 @@ class DenseProteinPredectionNet(HybridBlock):
         if self.droprate > 0:
             x = F.Dropout(x, self.droprate)
         x = self.dense2(x)
+        x = F.relu(self.bn3(x))
+        x = self.dense3(x)
         # x = self.features_to_mulWeight(x)
         x = self.out(x)
         return x
