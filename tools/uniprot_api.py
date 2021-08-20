@@ -1,10 +1,10 @@
 import requests, sys
+import os
 import json
 
-def getGene(uniprot_id):
+def getGeneFromApi(uniprot_id, write=False):
     params = {
-        'gene': uniprot_id,
-        'chromosome': 18
+        'accession': uniprot_id,
     }
     requestURL = "https://www.ebi.ac.uk/proteins/api/coordinates"
     r = requests.get(
@@ -16,11 +16,20 @@ def getGene(uniprot_id):
         r.raise_for_status()
         sys.exit()
     responseBody = r.json()
-    out = '../data/api_out/{}.json'.format(uniprot_id)
-    with open(out, 'w') as f:
-        json.dump(responseBody, f)
-    print(responseBody)
-    print('written out', out)
+    if write:
+        outdir = '../data/api_out'
+        if not os.path.isdir(outdir):
+            os.makedirs(outdir, exist_ok=True)
+        out = '{}/{}.json'.format(outdir, uniprot_id)
+        with open(out, 'w') as f:
+            json.dump(responseBody, f)
+        print('written out', out)
+    return responseBody
+
+def sequence(uniprot_id):
+    gene_data = getGeneFromApi(uniprot_id)
+    return gene_data[0]['sequence']
     
 if __name__ == '__main__':
-    getGene('Q8WU67')
+    gene_id = 'Q9Y5B0'
+    print(gene_id, sequence(gene_id))

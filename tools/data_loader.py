@@ -145,6 +145,7 @@ if __name__ == '__main__':
     dataloader.mappingDatabaseToOneHot('PubMed')
     dataloader.mappingDatabaseToOneHot('MIM')
     dataloader.mappingDatabaseToOneHot('RefSeq')
+    dataloader.mappingDatabaseToOneHot('Ensembl')
     # for gene in dataloader.genes:
         # print(dataloader.dataFromMappingDatabase('RefSeq', gene.id_uniprot))
     # dataloader.info()
