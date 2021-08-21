@@ -2,7 +2,11 @@ import requests, sys
 import os
 import json
 
-def getGeneFromApi(uniprot_id, write=False):
+def getGeneFromApi(
+        uniprot_id, 
+        write=False
+        outdir='../data/api_out'
+    ):
     params = {
         'accession': uniprot_id,
     }
@@ -17,7 +21,6 @@ def getGeneFromApi(uniprot_id, write=False):
         sys.exit()
     responseBody = r.json()
     if write:
-        outdir = '../data/api_out'
         if not os.path.isdir(outdir):
             os.makedirs(outdir, exist_ok=True)
         out = '{}/{}.json'.format(outdir, uniprot_id)
@@ -28,6 +31,9 @@ def getGeneFromApi(uniprot_id, write=False):
 
 def sequence(uniprot_id):
     gene_data = getGeneFromApi(uniprot_id)
+    if not len(gene_data):
+        print('no sequence found for gene {}'.format(uniprot_id))
+        return ''
     return gene_data[0]['sequence']
     
 if __name__ == '__main__':

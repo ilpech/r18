@@ -2,6 +2,7 @@ import numpy as np
 import os
 from typing import List
 from tools import readSearchXlsxReport
+from uniprot_api import getGeneFromApi, sequence
 
 class Gene:
     def __init__(
@@ -9,7 +10,7 @@ class Gene:
         uniprot_id
     ):
         self.id_uniprot: str = uniprot_id
-        print('created gene: ', self.id_uniprot)
+        # print('created gene: ', self.id_uniprot)
         self.ids = [] # other gene IDs key - name of database, e.g. uniprot, value - list of str ids
         # init by addProteinAbundanceReport
         self.ratio: float  = None #Ratio (Spep/Slab)
@@ -84,6 +85,40 @@ class Gene:
                         m_out = -1.0
                     self.rna_measurements[k] = m_out
                     break
+    
+    @staticmethod
+    def proteinAminoAcidsAlphabet():
+        return sorted([
+            'A', 'C', 'D', 'E', 'F', 
+            'G', 'H', 'I', 'K', 'L', 
+            'M', 'N', 'P', 'Q', 'R', 
+            'S', 'T', 'V', 'W', 'Y'
+        ])
+    
+    def apiData(self):
+        return getGeneFromApi(self.id())
+    
+    def apiSequence(self):
+        return sequence(self.id())
+    
+    def apiSeqOneHot(self):
+        return Gene.seq2oneHot(self.apiSequence())
+    
+    @staticmethod
+    def seq2oneHot(seq):
+        alphabet = Gene.proteinAminoAcidsAlphabet()
+        set_seq = set(seq)
+        if len(set_seq) > len(alphabet):
+            raise Exception('seq2oneHot:: seq len {} > alph len {}'.format(
+                len(set_seq), 
+                len(alphabet)
+            ))
+        onehot = [[0] * len(alphabet)] * len(seq)
+        onehot = np.array(onehot)
+        for i in range(len(seq)):
+            pos = [j for j in range(len(alphabet)) if alphabet[j] == seq[i]][0]
+            onehot[i][pos] = 1 #alphabet[j]
+        return onehot
 
 if __name__ == '__main__':
     data_path = '../data/liver_hepg2'
