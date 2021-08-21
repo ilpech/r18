@@ -4,7 +4,7 @@ import json
 
 def getGeneFromApi(
         uniprot_id, 
-        write=False
+        write=False,
         outdir='../data/api_out'
     ):
     params = {

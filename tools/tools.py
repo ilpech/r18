@@ -10,6 +10,15 @@ from mxnet import gluon, nd, image
 from mxnet.gluon.loss import Loss, _apply_weighting, _reshape_like
 import numpy as np
 
+def roundUp(a):
+    '''
+    округление всегда в большую сторону
+    '''
+    b = round(a)
+    if b < a:
+        b += 1
+    return b
+
 def is_number(s):
     try:
         float(s)
