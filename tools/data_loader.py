@@ -9,9 +9,19 @@
 # max 3349500 database Additional PubMed matrix (275, 609, 20)
 # useful_sheets_size contains of:
 #   - channel full of rna expetiment value
-#   - channel for sequence coding (...*20)
-#   - channel for experiment_id(?)
+#   - channel for rna experiment_id(?)
+#   - channel for amino acids sequence coding (...*20)
+#   OR - channels for rna experiments(?)
 #   - channels for each needed database with size <= max_database.shape[1]
+# 22 databases now
+# 3 channels listed above
+# 275 genes for 18 chr
+# 275*(22+3)*20*609
+# >>> sample_size = 25*20*609
+# >>> sample_size
+# 304500
+# like 24.78 pictures 64*64*3 => ~3 samples in batch
+# dataset of 275 weight like 6814.5 pictures 64*64*3
 import os
 import mxnet as mx
 import numpy as np
