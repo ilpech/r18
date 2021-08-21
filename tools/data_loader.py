@@ -36,6 +36,22 @@ class DataLoader:
     """
     data loader for liver_hepg2 r18 protein abundance experiment
     """
+    class magic_consts:
+        '''
+        just previously counted values for default setup
+        '''
+        # def __init__(self):
+        #     # DATABASE:: Additional PubMed
+        #     # db alph size 12180
+        #     # db aplh size converted to amino acids:: 609.0*20
+        max_database_size = 12180
+        protein_amino_acids_size = 20
+
+    @staticmethod
+    def max_db2acids_size():
+        return DataLoader.magic_consts.max_database_size/DataLoader.magic_consts.protein_amino_acids_size 
+        
+    
     def _get_argparse(self):
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -116,6 +132,23 @@ class DataLoader:
             )
             self.genes.append(gene)
         print('{} genes created'.format(len(self.genes)))
+
+    def gene2sampleExperimentHasId(self, gene_id):
+       databases = uniprot_mapping_header()
+       sample = np.zeros(
+           (
+               (len(databases)+3), 
+                # 3 channels::
+                #   - channel full of rna expetiment value
+                #   - channel for rna experiment_id(?)
+                #   - channel for amino acids sequence coding (...*20)
+                int(DataLoader.max_db2acids_size()),
+                int(DataLoader.magic_consts.protein_amino_acids_size)
+           )
+        )
+       print('stop at gene2sampleExperimentHasId')
+       print(sample.shape)
+       exit(0)
     
     def dataFromMappingDatabase(self, db_name, gene_name):
         '''
@@ -216,6 +249,7 @@ if __name__ == '__main__':
     # mim_onehot = dataloader.mappingDatabase2oneHot('MIM')
     # refseq_onehot = dataloader.mappingDatabase2oneHot('RefSeq')
     # ensembl_onehot = dataloader.mappingDatabase2oneHot('Ensembl')
+    dataloader.gene2sampleExperimentHasId('')
     databases = uniprot_mapping_header()
     max_shape = 0
     max_shape_orig = (0,0)
