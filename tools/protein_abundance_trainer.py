@@ -8,7 +8,7 @@ from tools import str2bool
 import yaml
 import time
 
-class DenseTrainer:
+class ProteinAbundanceTrainer:
     def __init__(self, config_path):
         with open(config_path) as f:
             self.config = yaml.load(f)

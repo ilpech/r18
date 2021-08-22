@@ -11,6 +11,19 @@ from mxnet.gluon.loss import Loss, _apply_weighting, _reshape_like
 import numpy as np
 from varname.helpers import debug
 
+def listfind(set_, subset_):
+    '''
+    returns found (ids_of_subset_found_objects_in_set, found_values)
+    '''
+    return (
+        [j for j in range(len(set_)) if set_[j] in subset_],
+        [x for x in set_ if x in subset_]
+    )
+    
+
+def list2nonEmptyIds(l):
+    return [j for j in range(len(l)) if l[j]]
+
 def roundUp(a):
     '''
     округление всегда в большую сторону

@@ -27,12 +27,14 @@ import mxnet as mx
 import numpy as np
 import argparse
 from tools import (
+    debug,
     str2bool, 
     readSearchXlsxReport, 
     roundUp,
     norm_shifted_log,
     denorm_shifted_log,
-    debug
+    list2nonEmptyIds,
+    listfind
 )
 from gene_mapping import mapping2dict, uniprot_mapping_header
 from uniprot_api import getGeneFromApi, sequence
@@ -141,11 +143,11 @@ class DataLoader:
             self.genes.append(gene)
         print('{} genes created'.format(len(self.genes)))
     
-    def gene(self, gene_id):
-        gene = [x for x in self.genes if x.id() == gene_id]
-        if not gene:
-           raise Exception('gene::gene {} not found'.format(gene_id))
-        return gene[0]
+    def gene(self, upirot_gene_id):
+        gene_ids = [i for i in range(len(self.genes)) if self.genes[i].id() == upirot_gene_id]
+        if not gene_ids:
+           raise Exception('gene::gene {} not found'.format(upirot_gene_id))
+        return self.genes[gene_ids[0]], gene_ids[0]
     
     def maxRnaMeasurementsInData(self):
         m = 0
@@ -157,17 +159,16 @@ class DataLoader:
 
     def gene2sampleExperimentHasId(
         self, 
-        gene_id, 
+        uniprot_gene_id, 
+        databases_gene_data,
         max_measures=None
     ):
         if not max_measures:
             max_measures = self.maxRnaMeasurementsInData()
-        databases = uniprot_mapping_header()
-        gene = self.gene(gene_id)
-        print('max_measures', max_measures)
-        
+        databases = uniprot_mapping_header()[:3]
+        gene, gene_idx = self.gene(uniprot_gene_id)
         experiments_size = len(gene.rna_measurements)
-        gene_experiments_batches = [] * experiments_size
+        variable_length_layer_size = int(DataLoader.max_db2acids_size())
         batch = np.zeros(
             (
                 (len(databases)+3), 
@@ -175,24 +176,45 @@ class DataLoader:
                 #   - channel full of rna expetiment value
                 #   - channel for rna experiment_id(?)
                 #   - channel for amino acids sequence coding (...*20)
-                int(DataLoader.max_db2acids_size()),
+                variable_length_layer_size,
                 int(DataLoader.magic_consts.protein_amino_acids_size)
             )
         )
-        experiments = sorted([e for e,_ in gene.rna_measurements.items()])
-        print('exps size {} max exps {}'.format(len(experiments), max_measures))
-        for exp in experiments:
+        gene_experiments_batches = [batch] * experiments_size
+        experiments_alph = sorted([e for e,_ in gene.rna_measurements.items()])
+        gene_seq_onehot = gene.apiSeqOneHot()
+        onehot_rows = gene_seq_onehot.shape[0]
+        if onehot_rows > variable_length_layer_size:
+           onehot_rows = variable_length_layer_size
+        api_seq = gene.apiSequence()
+        for i in range(experiments_size):
+            exp = experiments_alph[i]
             value = gene.rna_measurements[exp]
-            print(exp, value, 'log::', norm_shifted_log(value))
-            
-    #    for experiment, value in gene.rna_measurements.items():
-        #    experiment_batch = batch.copy()
-            
-        print('stop at gene2sampleExperimentHasId')
-        print(batch.shape)
-        debug(batch)
-        debug(batch.shape)
-        exit(0)
+            norm_value = norm_shifted_log(value)
+            # first channel is fullfilled with rna experiment value
+            gene_experiments_batches[i][0].fill(norm_value)
+            # second channel is fullfilled with rna experiment id
+            gene_experiments_batches[i][1].fill(i)
+            # third channel is filled by gene seq in onehot representation
+            gene_experiments_batches[i][2][:onehot_rows] = gene_seq_onehot[:onehot_rows]
+            # !debug
+            # for l,row in enumerate(gene_experiments_batches[i][2]):
+            #     id_ = list2nonEmptyIds(row)
+            #     if not len(id_):
+            #         # empty row detected
+            #         break
+            #     id_ = id_[0]
+            #     debug(Gene.proteinAminoAcidsAlphabet()[id_])
+            #     # print(gene_seq_onehot[l][id_])
+            #     print('from api', api_seq[l])
+            #     print(row)
+            # debug(np.sum(gene_seq_onehot))
+            # debug(np.sum(gene_experiments_batches[i][2]))
+            for j, database in enumerate(databases):
+                id2fill = j + 3
+                len_filled = databases_gene_data[j].shape[0]
+                gene_experiments_batches[i][id2fill][:len_filled] = databases_gene_data[j]
+        return gene_experiments_batches            
     
     def dataFromMappingDatabase(self, db_name, gene_name):
         '''
@@ -200,7 +222,7 @@ class DataLoader:
         '''
         return self.mapping[gene_name][db_name]
     
-    def geneMappingDatabases(self, gene_name):
+    def geneMappingDatabase(self, gene_name):
         return self.geneMappingDatabases[gene_name]
     
     def mappingDatabaseAlphabet(self, db_name):
@@ -218,17 +240,17 @@ class DataLoader:
     def mappingDatabase2matrix(self, db_name, cols=20):
         onehot = self.mappingDatabase2oneHot(db_name)
         uniq_size = roundUp(onehot.shape[1]/float(cols))
-        print(db_name)
-        print(onehot.shape)
-        print(uniq_size)
+        # print(db_name)
+        # print(onehot.shape)
+        # print(uniq_size)
         reshape = np.zeros((onehot.shape[0], uniq_size, cols)).flatten()
         for gene_id in range(len(onehot)):
             for value_id in range(len(onehot[gene_id])):
                 reshape[len(onehot[gene_id])*gene_id + value_id] = onehot[gene_id][value_id]
-        print('reshape.flatten.shape', reshape.shape)
+        # print('reshape.flatten.shape', reshape.shape)
         reshape = np.reshape(reshape, (onehot.shape[0], uniq_size, cols))
-        print('reshape.shape', reshape.shape)
-        print('sum ', np.sum(reshape))
+        # print('reshape.shape', reshape.shape)
+        # print('sum ', np.sum(reshape))
         return reshape
     
     def mappingDatabase2oneHot(self, db_name):
@@ -286,7 +308,7 @@ class DataLoader:
             print(self.mapping[gene.id()]['Ensembl'])
 
 if __name__ == '__main__':
-    dataloader = DataLoader('../config/dense_train.yaml')
+    dataloader = DataLoader('../config/train.yaml')
     # gi_onehot = dataloader.mappingDatabase2oneHot('GI')
     # go_onehot = dataloader.mappingDatabase2oneHot('GO')
     # pubmed_onehot = dataloader.mappingDatabase2oneHot('PubMed')
@@ -294,9 +316,15 @@ if __name__ == '__main__':
     # refseq_onehot = dataloader.mappingDatabase2oneHot('RefSeq')
     # ensembl_onehot = dataloader.mappingDatabase2oneHot('Ensembl')
     max_measures=dataloader.maxRnaMeasurementsInData()
-    for gene in dataloader.genes:
-        dataloader.gene2sampleExperimentHasId(gene.id_uniprot, max_measures)
-    databases = uniprot_mapping_header()
+    databases = uniprot_mapping_header()[:3]
+    databases_data = [dataloader.mappingDatabase2matrix(x) for x in databases]
+    for i,gene in enumerate(dataloader.genes):
+        all_databases_gene_data = [x[i] for x in databases_data]
+        dataloader.gene2sampleExperimentHasId(
+            gene.id_uniprot, 
+            all_databases_gene_data,
+            max_measures
+        )
     max_shape = 0
     max_shape_orig = (0,0)
     max_shape_name = ''
