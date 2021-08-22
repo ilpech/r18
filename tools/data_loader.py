@@ -229,7 +229,7 @@ class DataLoader:
     
     def dataFromMappingDatabase(self, db_name, gene_name):
         '''
-        db_name should exitst in self.genes_mapping_databases
+        db_name should exist in self.genes_mapping_databases
         '''
         return self.mapping[gene_name][db_name]
     
@@ -251,17 +251,11 @@ class DataLoader:
     def mappingDatabase2matrix(self, db_name, cols=20):
         onehot = self.mappingDatabase2oneHot(db_name)
         uniq_size = roundUp(onehot.shape[1]/float(cols))
-        # print(db_name)
-        # print(onehot.shape)
-        # print(uniq_size)
         reshape = np.zeros((onehot.shape[0], uniq_size, cols)).flatten()
         for gene_id in range(len(onehot)):
             for value_id in range(len(onehot[gene_id])):
                 reshape[len(onehot[gene_id])*gene_id + value_id] = onehot[gene_id][value_id]
-        # print('reshape.flatten.shape', reshape.shape)
         reshape = np.reshape(reshape, (onehot.shape[0], uniq_size, cols))
-        # print('reshape.shape', reshape.shape)
-        # print('sum ', np.sum(reshape))
         return reshape
     
     def mappingDatabase2oneHot(self, db_name):
@@ -336,17 +330,18 @@ if __name__ == '__main__':
             continue
         databases_data.append(mtrx)
         databases2use.append(x)
-        print(x, mtrx.shape, np.sum(mtrx))
     # exit(0)
     for i,gene in enumerate(dataloader.genes):
         all_databases_gene_data = [x[i] for x in databases_data]
         print('gene {} of {}'.format(i, len(dataloader.genes)))
-        dataloader.gene2sampleExperimentHasId(
+        gene_batch_exps = dataloader.gene2sampleExperimentHasId(
             gene.id_uniprot, 
             all_databases_gene_data,
             databases2use,
             max_measures
         )
+        debug(gene_batch_exps[0].shape)
+        exit(0)
     max_shape = 0
     max_shape_orig = (0,0)
     max_shape_name = ''
@@ -367,6 +362,6 @@ if __name__ == '__main__':
             print('example::')
             print(alph[:5])
     print('max', max_shape, 'database', max_shape_name, 'matrix', max_shape_orig)
-    # dataloader.sequencesAnalys()
+    dataloader.sequencesAnalys()
     
         
