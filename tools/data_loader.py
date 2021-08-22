@@ -26,7 +26,14 @@ import os
 import mxnet as mx
 import numpy as np
 import argparse
-from tools import str2bool, readSearchXlsxReport, roundUp
+from tools import (
+    str2bool, 
+    readSearchXlsxReport, 
+    roundUp,
+    norm_shifted_log,
+    denorm_shifted_log,
+    debug
+)
 from gene_mapping import mapping2dict, uniprot_mapping_header
 from uniprot_api import getGeneFromApi, sequence
 from typing import List
@@ -44,12 +51,13 @@ class DataLoader:
         #     # DATABASE:: Additional PubMed
         #     # db alph size 12180
         #     # db aplh size converted to amino acids:: 609.0*20
-        max_database_size = 12180
+        max_database_alph_size = 12180
         protein_amino_acids_size = 20
 
     @staticmethod
     def max_db2acids_size():
-        return DataLoader.magic_consts.max_database_size/DataLoader.magic_consts.protein_amino_acids_size 
+        return DataLoader.magic_consts.max_database_alph_size/ \
+               DataLoader.magic_consts.protein_amino_acids_size 
         
     
     def _get_argparse(self):
@@ -132,23 +140,59 @@ class DataLoader:
             )
             self.genes.append(gene)
         print('{} genes created'.format(len(self.genes)))
+    
+    def gene(self, gene_id):
+        gene = [x for x in self.genes if x.id() == gene_id]
+        if not gene:
+           raise Exception('gene::gene {} not found'.format(gene_id))
+        return gene[0]
+    
+    def maxRnaMeasurementsInData(self):
+        m = 0
+        for g in self.genes:
+            exps = len(g.rna_measurements)
+            if exps > m:
+                m = exps
+        return m
 
-    def gene2sampleExperimentHasId(self, gene_id):
-       databases = uniprot_mapping_header()
-       sample = np.zeros(
-           (
-               (len(databases)+3), 
+    def gene2sampleExperimentHasId(
+        self, 
+        gene_id, 
+        max_measures=None
+    ):
+        if not max_measures:
+            max_measures = self.maxRnaMeasurementsInData()
+        databases = uniprot_mapping_header()
+        gene = self.gene(gene_id)
+        print('max_measures', max_measures)
+        
+        experiments_size = len(gene.rna_measurements)
+        gene_experiments_batches = [] * experiments_size
+        batch = np.zeros(
+            (
+                (len(databases)+3), 
                 # 3 channels::
                 #   - channel full of rna expetiment value
                 #   - channel for rna experiment_id(?)
                 #   - channel for amino acids sequence coding (...*20)
                 int(DataLoader.max_db2acids_size()),
                 int(DataLoader.magic_consts.protein_amino_acids_size)
-           )
+            )
         )
-       print('stop at gene2sampleExperimentHasId')
-       print(sample.shape)
-       exit(0)
+        experiments = sorted([e for e,_ in gene.rna_measurements.items()])
+        print('exps size {} max exps {}'.format(len(experiments), max_measures))
+        for exp in experiments:
+            value = gene.rna_measurements[exp]
+            print(exp, value, 'log::', norm_shifted_log(value))
+            
+    #    for experiment, value in gene.rna_measurements.items():
+        #    experiment_batch = batch.copy()
+            
+        print('stop at gene2sampleExperimentHasId')
+        print(batch.shape)
+        debug(batch)
+        debug(batch.shape)
+        exit(0)
     
     def dataFromMappingDatabase(self, db_name, gene_name):
         '''
@@ -249,7 +293,9 @@ if __name__ == '__main__':
     # mim_onehot = dataloader.mappingDatabase2oneHot('MIM')
     # refseq_onehot = dataloader.mappingDatabase2oneHot('RefSeq')
     # ensembl_onehot = dataloader.mappingDatabase2oneHot('Ensembl')
-    dataloader.gene2sampleExperimentHasId('')
+    max_measures=dataloader.maxRnaMeasurementsInData()
+    for gene in dataloader.genes:
+        dataloader.gene2sampleExperimentHasId(gene.id_uniprot, max_measures)
     databases = uniprot_mapping_header()
     max_shape = 0
     max_shape_orig = (0,0)
