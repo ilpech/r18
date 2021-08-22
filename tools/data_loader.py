@@ -36,7 +36,11 @@ from tools import (
     list2nonEmptyIds,
     listfind
 )
-from gene_mapping import mapping2dict, uniprot_mapping_header
+from gene_mapping import (
+    mapping2dict, 
+    uniprot_mapping_header, 
+    uniq_nonempty_uniprot_mapping_header
+)
 from uniprot_api import getGeneFromApi, sequence
 from typing import List
 from gene import Gene
@@ -161,17 +165,17 @@ class DataLoader:
         self, 
         uniprot_gene_id, 
         databases_gene_data,
+        databases2use,
         max_measures=None
     ):
         if not max_measures:
             max_measures = self.maxRnaMeasurementsInData()
-        databases = uniprot_mapping_header()[:3]
         gene, gene_idx = self.gene(uniprot_gene_id)
         experiments_size = len(gene.rna_measurements)
         variable_length_layer_size = int(DataLoader.max_db2acids_size())
         batch = np.zeros(
             (
-                (len(databases)+3), 
+                (len(databases2use)+3), 
                 # 3 channels::
                 #   - channel full of rna expetiment value
                 #   - channel for rna experiment_id(?)
@@ -196,7 +200,8 @@ class DataLoader:
             # second channel is fullfilled with rna experiment id
             gene_experiments_batches[i][1].fill(i)
             # third channel is filled by gene seq in onehot representation
-            gene_experiments_batches[i][2][:onehot_rows] = gene_seq_onehot[:onehot_rows]
+            if onehot_rows:
+                gene_experiments_batches[i][2][:onehot_rows] = gene_seq_onehot[:onehot_rows]
             # !debug
             # for l,row in enumerate(gene_experiments_batches[i][2]):
             #     id_ = list2nonEmptyIds(row)
@@ -210,10 +215,16 @@ class DataLoader:
             #     print(row)
             # debug(np.sum(gene_seq_onehot))
             # debug(np.sum(gene_experiments_batches[i][2]))
-            for j, database in enumerate(databases):
+            for j, database in enumerate(databases2use):
                 id2fill = j + 3
                 len_filled = databases_gene_data[j].shape[0]
                 gene_experiments_batches[i][id2fill][:len_filled] = databases_gene_data[j]
+        print(
+            'created batch {} for gene {}'.format(  
+                np.array(gene_experiments_batches).shape,
+                gene.id()
+            ) 
+        )
         return gene_experiments_batches            
     
     def dataFromMappingDatabase(self, db_name, gene_name):
@@ -316,13 +327,24 @@ if __name__ == '__main__':
     # refseq_onehot = dataloader.mappingDatabase2oneHot('RefSeq')
     # ensembl_onehot = dataloader.mappingDatabase2oneHot('Ensembl')
     max_measures=dataloader.maxRnaMeasurementsInData()
-    databases = uniprot_mapping_header()[:3]
-    databases_data = [dataloader.mappingDatabase2matrix(x) for x in databases]
+    databases = uniq_nonempty_uniprot_mapping_header()
+    databases_data = []
+    databases2use =[]
+    for x in databases:
+        mtrx = dataloader.mappingDatabase2matrix(x)
+        if not mtrx.shape[1]:
+            continue
+        databases_data.append(mtrx)
+        databases2use.append(x)
+        print(x, mtrx.shape, np.sum(mtrx))
+    # exit(0)
     for i,gene in enumerate(dataloader.genes):
         all_databases_gene_data = [x[i] for x in databases_data]
+        print('gene {} of {}'.format(i, len(dataloader.genes)))
         dataloader.gene2sampleExperimentHasId(
             gene.id_uniprot, 
             all_databases_gene_data,
+            databases2use,
             max_measures
         )
     max_shape = 0

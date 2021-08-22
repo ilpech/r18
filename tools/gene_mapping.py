@@ -1,6 +1,25 @@
 import os 
 import gzip
 
+def uniq_nonempty_uniprot_mapping_header():
+    return [
+        'UniProtKB-ID',
+        'GeneID (EntrezGene)',
+        'RefSeq',
+        'GI',
+        'PDB',
+        'GO',
+        'UniRef100',
+        'PIR',
+        'MIM',
+        'PubMed',
+        'EMBL',
+        'EMBL-CDS',
+        'Ensembl',
+        'Ensembl_PRO',
+        'Additional PubMed'
+    ]
+    
 def uniprot_mapping_header():
     return [
         'UniProtKB-AC',
