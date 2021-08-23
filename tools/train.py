@@ -114,18 +114,21 @@ class ProteinAbundanceTrainer:
         self.wd = self.train_settings['wd']
         self.momentum = self.train_settings['momentum']
         self.optimizer = self.train_settings['optimizer']
-        self.net_name = 'resnetregr.001'
+        self.net_name = 'resnetregr.004'
         self.params_path = '../trained/{}'.format(self.net_name)
-        num_layers=16
-        width_factor=2.0
-        assert (num_layers - 4) % 6 == 0
-        n = (num_layers - 4) // 6
-        layers = [n] * 3
-        channels = [16, 16*width_factor, 32*width_factor, 64*width_factor]
         drop_rate = 0.0
+        num_layers=22
+        width_factor=2
+        if isdebug:
+            num_layers=16
+            width_factor=1
+        assert (num_layers - 4) % 6 == 0
+        # n = (num_layers - 4) // 6
+        # layers = [n] * 3
+        # channels = [16, 16*width_factor, 32*width_factor, 64*width_factor]
         self.model = RegressionResNet.get_regression_wide_resnet(
-            16, 
-            1, 
+            num_layers, 
+            width_factor, 
             drop_rate=0.0
         )
 
@@ -141,24 +144,13 @@ class ProteinAbundanceTrainer:
     def export_nn(self, epoch, export_path=None):
         if export_path == None:
             export_path = os.path.join(self.params_path, '..')
-        exp_dir = os.path.join(export_path, 'exported', self.net_name)
+        exp_dir = os.path.join(export_path, self.net_name)
         cwd = os.getcwd()
         ensure_folder(exp_dir)
         os.chdir(exp_dir)
-        # self.net.hybridize()
-        # sample_img = mx.nd.ones((
-        #     1,
-        #     self.input_shape_cwh[0],
-        #     self.input_shape_cwh[1],
-        #     self.input_shape_cwh[2])
-        # )
-        # self.net(sample_img)
         self.model.export(self.net_name, epoch=epoch)
         self.weights_path = '{}-{:04d}.params'.format(self.net_name, epoch)
         self.sym_path = '{}-symbol.json'.format(self.net_name)
-        # if self.dict_path != None:
-        #     shutil.copy(self.dict_path, '.')
-        #     print('dict copied in export dir')
         print('Network was successfully exported at', exp_dir)
         os.chdir(cwd)
 
@@ -187,14 +179,18 @@ class ProteinAbundanceTrainer:
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self.net = gluon.nn.SymbolBlock.imports(sym_path, ['data'], params_path, ctx=self.ctx)
+            self.net = mx.gluon.nn.SymbolBlock.imports(
+                sym_path, 
+                ['data'], 
+                params_path, 
+                ctx=self.ctx[0]
+            )
             self.sym_path = sym_path
             self.params_path = params_path
         
 
     def train_loop(self):
         lrs = [v for _,v in self.lr_settings.items()]
-        # print(lrs)
         self.model.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=self.ctx[0])
         self.model.collect_params().reset_ctx(self.ctx[0])
         self.model.hybridize()
@@ -208,78 +204,66 @@ class ProteinAbundanceTrainer:
             self.optimizer, 
             optimizer_params
         )
-        max_measures = self.data_loader.maxRnaMeasurementsInData()
         databases = uniq_nonempty_uniprot_mapping_header()
-        if isdebug:
-            databases = databases[:3]
-        databases_data = []
-        databases2use =[]
-        for x in databases:
-            mtrx = self.data_loader.mappingDatabase2matrix(x)
-            if not mtrx.shape[1]:
-                continue
-            databases_data.append(mtrx)
-            databases2use.append(x)
-        genes_exps_batches = []
-        for j, gene in enumerate(self.data_loader.genes):
-            if isdebug:
-                if j >= 3:
-                    print('debug::genes::', j)
-                    break
-            print('gene {} of {}'.format(j, len(self.data_loader.genes)))
-            all_databases_gene_data = [x[j] for x in databases_data]
-            genes_exps_batches.append(
-                self.data_loader.gene2sampleExperimentHasId(
-                    gene.id_uniprot, 
-                    all_databases_gene_data,
-                    databases2use,
-                    max_measures
-                )
-            )
-        data = []
-        labels = []
-        for gene_id in range(len(genes_exps_batches)):
-            gene = self.data_loader.genes[gene_id] # проверить точно ли правильная индексация?
-            for exp_id in range(len(genes_exps_batches[gene_id])):
-                try:
-                    if not is_number(gene.protein_copies_per_cell_1D):
-                        continue
-                    data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
-                    labels.append(gene.protein_copies_per_cell_1D)
-                except:
-                    pass
+        # max_measures = self.data_loader.maxRnaMeasurementsInData()
+        # if isdebug:
+        #     databases = databases[:3]
+        # databases_data = []
+        # databases2use =[]
+        # for x in databases:
+        #     mtrx = self.data_loader.mappingDatabase2matrix(x)
+        #     if not mtrx.shape[1]:
+        #         continue
+        #     databases_data.append(mtrx)
+        #     databases2use.append(x)
+        # genes_exps_batches = []
+        # for j, gene in enumerate(self.data_loader.genes):
+        #     if isdebug:
+        #         if j >= 3:
+        #             print('debug::genes::', j)
+        #             break
+        #     print('gene {} of {}'.format(j, len(self.data_loader.genes)))
+        #     all_databases_gene_data = [x[j] for x in databases_data]
+        #     genes_exps_batches.append(
+        #         self.data_loader.gene2sampleExperimentHasId(
+        #             gene.id_uniprot, 
+        #             all_databases_gene_data,
+        #             databases2use,
+        #             max_measures
+        #         )
+        #     )
+        # data = []
+        # labels = []
+        # for gene_id in range(len(genes_exps_batches)):
+        #     gene = self.data_loader.genes[gene_id] # проверить точно ли правильная индексация?
+        #     for exp_id in range(len(genes_exps_batches[gene_id])):
+        #         try:
+        #             if not is_number(gene.protein_copies_per_cell_1D):
+        #                 continue
+        #             data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
+        #             labels.append(gene.protein_copies_per_cell_1D)
+        #         except:
+        #             pass
+        data, labels = self.data_loader.data(isdebug)
         data_cnt = len(labels)
         data2val_cnt = roundUp(data_cnt/5)
         max_label = np.max(labels)
         norm_labels = [float(x/max_label) for x in labels]
-        # data_norm_labels = np.array([data, norm_labels])
-        # print(da)
-        # data_norm_labels = mx.nd.random.shuffle(data_norm_labels) 
-        # data_batch = mx.gluon.data.dataset.ArrayDataset(data_norm_labels)
         data2train = mx.gluon.data.dataset.ArrayDataset(data[data2val_cnt:], norm_labels[data2val_cnt:])
         data2val = mx.gluon.data.dataset.ArrayDataset(data[:data2val_cnt], norm_labels[:data2val_cnt])
-        # print(data_batch)
-        # data_batch = mx.nd.random.shuffle(data_batch)
         batch_size = 5
-        # data_train = data_batch[data2val_cnt:]
-        # data_val = data_batch[:data2val_cnt]
         debug(data_cnt)
-        debug(len(data2train[0]))
-        debug(len(data2val[0]))
         debug(len(data2train))
         debug(len(data2val))
-        # print('exit')
-        # exit()
         train_loader = mx.gluon.data.DataLoader(data2train, batch_size=batch_size, shuffle=True)
         val_loader = mx.gluon.data.DataLoader(data2val, batch_size=batch_size, shuffle=False)
-        genes_exps_batches = mx.nd.array(genes_exps_batches)
         L = mx.gluon.loss.L2Loss()
         num_batch = roundUp(len(labels)/batch_size)
         train_metric = mx.metric.MSE()
         val_metric = mx.metric.MSE()
         best_epoch = None
         min_val_error = None
-        for i in range(self.epochs):
+        for i in range(1, self.epochs):
             tic = time.time()
             train_metric.reset()
             val_metric.reset()
@@ -312,7 +296,7 @@ class ProteinAbundanceTrainer:
                 if abs(val_acc) < min_val_error:
                     min_val_error = val_acc
                     new_best_val = True
-                    best_epoch = i + 1
+                    best_epoch = i
             train_loss /= num_batch
             epoch_time = time.time() - tic
             msg = '[Epoch::{:03d}] time::{:.1f} \n'\
@@ -329,7 +313,8 @@ class ProteinAbundanceTrainer:
             if not i % 10 or (i > 30 and new_best_val):
                 if new_best_val:
                     print('new best val')
-                self.export_nn(i+1, '../trained')
+                if not isdebug:
+                    self.export_nn(i, '../trained')
             if min_val_error and not new_best_val:
                 print('best val was at epoch({})::{:.8f}'.format(best_epoch, min_val_error))
         

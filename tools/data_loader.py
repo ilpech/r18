@@ -35,7 +35,9 @@ from tools import (
     denorm_shifted_log,
     list2nonEmptyIds,
     listfind,
-    is_number
+    is_number,
+    setindxs,
+    shuffle
 )
 from gene_mapping import (
     mapping2dict, 
@@ -303,30 +305,29 @@ class DataLoader:
         print('max seq', max_seq, len(max_seq))
         print('max set seq', max_set_seq, len(max_set_seq))
     
-    def data(self):
+    def data(self, isdebug=False):
+        lim_ifdebug = 3
+        max_measures = self.maxRnaMeasurementsInData()
+        gene_exp_data2train = []
         databases = uniq_nonempty_uniprot_mapping_header()
+        if isdebug:
+            databases = databases[:lim_ifdebug]
         databases_data = []
         databases2use =[]
         for x in databases:
-            mtrx = self.data_loader.mappingDatabase2matrix(x)
+            mtrx = self.mappingDatabase2matrix(x)
             if not mtrx.shape[1]:
                 continue
             databases_data.append(mtrx)
             databases2use.append(x)
         genes_exps_batches = []
-        prot1d = [
-            x for x in dataloader.genes \
-            if is_number(x.protein_copies_per_cell_1D) and x.protein_copies_per_cell_1D > 0
-        ]
-        prot2d = [
-            x.protein_copies_per_cell_2D for x in dataloader.genes \
-            if is_number(x.protein_copies_per_cell_2D) and x.protein_copies_per_cell_2D > 0
-        ]
-        for j, gene in enumerate(self.data_loader.genes):
-            print('gene {} of {}'.format(j, len(self.data_loader.genes)))
+        for j, gene in enumerate(self.genes):
+            if j >= lim_ifdebug:
+                break
+            print('gene {} of {}'.format(j, len(self.genes)))
             all_databases_gene_data = [x[j] for x in databases_data]
             genes_exps_batches.append(
-                self.data_loader.gene2sampleExperimentHasId(
+                self.gene2sampleExperimentHasId(
                     gene.id_uniprot, 
                     all_databases_gene_data,
                     databases2use,
@@ -336,7 +337,7 @@ class DataLoader:
         data = []
         labels = []
         for gene_id in range(len(genes_exps_batches)):
-            gene = self.data_loader.genes[gene_id] # проверить точно ли правильная индексация?
+            gene = self.genes[gene_id] # проверить точно ли правильная индексация?
             for exp_id in range(len(genes_exps_batches[gene_id])):
                 try:
                     if not is_number(gene.protein_copies_per_cell_1D):
@@ -345,6 +346,9 @@ class DataLoader:
                     labels.append(gene.protein_copies_per_cell_1D)
                 except:
                     pass
+        labels, shuffle_indxs = shuffle(labels)
+        data = setindxs(data, shuffle_indxs)
+        return data, labels
     
     def info(self):
         for gene in self.genes:

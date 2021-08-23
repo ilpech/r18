@@ -33,6 +33,14 @@ def roundUp(a):
         b += 1
     return b
 
+def setindxs(l_, indxs):
+    return [l_[indxs[i]] for i in range(len(indxs))]
+    
+def shuffle(l):
+    indxs = [i for i in range(len(l))]
+    np.random.shuffle(indxs)
+    return setindxs(l, indxs), indxs
+
 def is_number(s):
     try:
         float(s)
