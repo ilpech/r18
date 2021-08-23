@@ -28,8 +28,8 @@ from gene_mapping import (
     uniq_nonempty_uniprot_mapping_header
 )
 
-isdebug = True
-# isdebug = False
+# isdebug = True
+isdebug = False
 
 class RegressionResNet(HybridBlock):
     def __init__(self, block, layers, channels, drop_rate, **kwargs):

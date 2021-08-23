@@ -344,7 +344,7 @@ class DataLoader:
                     if not is_number(gene.protein_copies_per_cell_1D):
                         continue
                     data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
-                    labels.append(gene.protein_copies_per_cell_1D)
+                    labels.append(norm_shifted_log(gene.protein_copies_per_cell_1D))
                 except:
                     pass
         labels, shuffle_indxs = shuffle(labels)
