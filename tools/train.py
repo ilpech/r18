@@ -96,8 +96,10 @@ class ProteinAbundanceTrainer:
         try:
             self.ctx = [mx.gpu()]
             a = mx.nd.array([[0]], ctx=self.ctx[0])
+            print('successfully created gpu array -> using gpu')
         except:
             self.ctx = [mx.cpu()]
+            print('cannot create gpu array -> using cpu')
         self.train_settings = self.config['train']
         self.lr_settings = self.train_settings['lr']
         self.batch_settings = self.train_settings['batch_size']
