@@ -172,8 +172,12 @@ class ProteinAbundanceTrainer:
         for gene_id in range(len(genes_exps_batches)):
             gene = self.data_loader.genes[gene_id] # проверить точно ли правильная индексация?
             for exp_id in range(len(genes_exps_batches[gene_id])):
-                data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
-                labels.append(gene.protein_copies_per_cell_1D)
+                try:
+                    data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
+                    labels.append(gene.protein_copies_per_cell_1D)
+                except:
+                    pass
+        data_cnt = len(labels)
         max_label = np.max(labels)
         norm_labels = [float(x/max_label) for x in labels]
         data_batch = mx.gluon.data.dataset.ArrayDataset(data, norm_labels)
