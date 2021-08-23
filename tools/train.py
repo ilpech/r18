@@ -251,7 +251,9 @@ class ProteinAbundanceTrainer:
         norm_labels = [float(x/max_label) for x in labels]
         data2train = mx.gluon.data.dataset.ArrayDataset(data[data2val_cnt:], norm_labels[data2val_cnt:])
         data2val = mx.gluon.data.dataset.ArrayDataset(data[:data2val_cnt], norm_labels[:data2val_cnt])
-        batch_size = 5
+        batch_size = 32
+        if isdebug:
+            batch_size = 3
         debug(data_cnt)
         debug(len(data2train))
         debug(len(data2val))
