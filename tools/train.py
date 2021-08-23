@@ -6,9 +6,8 @@ import argparse
 from tools import str2bool
 import yaml
 import time
-from cifar_wide_resnet import WideResNet, WideResNetBlock, get_cifar_wide_resnet
+from cifar_wide_resnet import WideResNet, WideResNetBlock
 from mxnet.gluon.block import HybridBlock
-from dense_model import DenseProteinPredectionNet
 from mxnet.gluon import nn
 from tools import (
     debug,
@@ -26,7 +25,7 @@ from gene_mapping import (
     uniq_nonempty_uniprot_mapping_header
 )
 
-isdebug = True
+isdebug = False
 
 class RegressionResNet(HybridBlock):
     def __init__(self, block, layers, channels, drop_rate, **kwargs):
@@ -38,27 +37,56 @@ class RegressionResNet(HybridBlock):
             self.features_to_dense = nn.HybridSequential(prefix='')
             self.features_to_dense.add(nn.GlobalAvgPool2D())
             self.features_to_dense.add(nn.Flatten())
-            self.features_to_dense.add(nn.Dense(1))
+            self.out = nn.Dense(1)
     
-        def hybrid_forward(self, F, x):
-            x = self.features_extractor(x)
-            x = F.relu(self.bn(x))
-            x = self.features_to_dense(x)
-            return x
+    def hybrid_forward(self, F, x):
+        x = self.features_extractor(x)
+        x = F.relu(self.bn(x))
+        x = self.features_to_dense(x)
+        x = self.out(x)
+        return x
+    
+    @staticmethod
+    def get_regression_wide_resnet(
+            num_layers, 
+            width_factor=1, 
+            drop_rate=0.0, 
+            ctx=mx.cpu(), 
+            **kwargs
+        ):
+        assert (num_layers - 4) % 6 == 0
+        n = (num_layers - 4) // 6
+        layers = [n] * 3
+        channels = [16, 16*width_factor, 32*width_factor, 64*width_factor]
+        net = RegressionResNet(WideResNetBlock, layers, channels, drop_rate, **kwargs)
+        return net
 
-def get_regression_wide_resnet(
-        num_layers, 
-        width_factor=1, 
-        drop_rate=0.0, 
-        ctx=mx.cpu(), 
-        **kwargs
-    ):
-    assert (num_layers - 4) % 6 == 0
-    n = (num_layers - 4) // 6
-    layers = [n] * 3
-    channels = [16, 16*width_factor, 32*width_factor, 64*width_factor]
-    net = RegressionResNet(WideResNetBlock, layers, channels, drop_rate, **kwargs)
-    return net
+    @staticmethod
+    def checknet():
+        net = RegressionResNet.get_regression_wide_resnet(16, 2, 0.0, mx.cpu())
+        net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=mx.cpu())
+        net.collect_params().reset_ctx(mx.cpu())
+        b = mx.nd.zeros(shape=(1,3,64,64))
+        debug(b.shape)
+        debug(net.features_extractor(b).shape)
+        debug(net.features_to_dense(b).shape)
+        debug(net(b).shape)
+        a = mx.nd.random.uniform(shape=(2,18,609,20))
+        c = mx.nd.random.uniform(shape=(2,18,300,20))
+        d = mx.nd.random.uniform(shape=(2,18,300,22))
+        net = RegressionResNet.get_regression_wide_resnet(16, 2, 0.0, mx.cpu())
+        net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=mx.cpu())
+        net.collect_params().reset_ctx(mx.cpu())
+        debug(a.shape)
+        debug(net(a).shape)
+        debug(net(a))
+        debug(c.shape)
+        debug(net(c).shape)
+        debug(net(c))
+        debug(d.shape)
+        debug(net(d).shape)
+        debug(net(d))
+        # but cannot do net(b) because of 3 channels
 
 class ProteinAbundanceTrainer:
     def __init__(self, config_path):
@@ -87,15 +115,12 @@ class ProteinAbundanceTrainer:
         layers = [n] * 3
         channels = [16, 16*width_factor, 32*width_factor, 64*width_factor]
         drop_rate = 0.0
-        # self.model = WideResNet.get_fe(WideResNetBlock, layers, channels, drop_rate)
-        # self.model = get_cifar_wide_resnet(16, 1, classes=['asd', 'lal'], ctx=mx.cpu())
-        # self.model = DenseProteinPredectionNet(80)
-        # exit(0)
-        self.model = get_regression_wide_resnet(16, 1, drop_rate=0.0)
-        print(self.model.features_extractor)
-        exit(0)
+        self.model = RegressionResNet.get_regression_wide_resnet(
+            16, 
+            1, 
+            drop_rate=0.0
+        )
 
-        
     def train_loop(self):
         lrs = [v for _,v in self.lr_settings.items()]
         # print(lrs)
@@ -115,7 +140,7 @@ class ProteinAbundanceTrainer:
         max_measures = self.data_loader.maxRnaMeasurementsInData()
         databases = uniq_nonempty_uniprot_mapping_header()
         if isdebug:
-            databases = databases[:2]
+            databases = databases[:3]
         databases_data = []
         databases2use =[]
         for x in databases:
@@ -127,7 +152,8 @@ class ProteinAbundanceTrainer:
         genes_exps_batches = []
         for j, gene in enumerate(self.data_loader.genes):
             if isdebug:
-                if j >= 10:
+                if j >= 3:
+                    print('debug::genes::', j)
                     break
             print('gene {} of {}'.format(j, len(self.data_loader.genes)))
             all_databases_gene_data = [x[j] for x in databases_data]
@@ -139,29 +165,54 @@ class ProteinAbundanceTrainer:
                     max_measures
                 )
             )
-            break
+        data = []
+        labels = []
+        for gene_id in range(len(genes_exps_batches)):
+            gene = self.data_loader.genes[gene_id] # проверить точно ли правильная индексация?
+            for exp_id in range(len(genes_exps_batches[gene_id])):
+                data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
+                labels.append(gene.protein_copies_per_cell_1D)
+        max_label = np.max(labels)
+        norm_labels = [float(x/max_label) for x in labels]
+        data_batch = mx.gluon.data.dataset.ArrayDataset(data, norm_labels)
+        batch_size = 5
+        train_loader = mx.gluon.data.DataLoader(data_batch, batch_size=batch_size, shuffle=True)
+        genes_exps_batches = mx.nd.array(genes_exps_batches)
+        L = mx.gluon.loss.L2Loss()
+        num_batch = roundUp(len(labels)/batch_size)
+        train_metric = mx.metric.MSE()
         for i in range(self.epochs):
             tic = time.time()
-            for j,gene_experiments in enumerate(genes_exps_batches):
-                for exp in gene_experiments:
-                    mxarr = mx.nd.array(exp)
-                    # mxarr = mx.nd.zeros(shape=(3,64,64))
-                    mxarr = mxarr.expand_dims(0)
-                    debug(mxarr.shape)
-                    out = self.model(mxarr)
-                    debug(out)
-                    debug(out.shape)
-                    exit()
+            train_metric.reset()
+            train_loss = 0
+            passed = 0
+            while passed < len(data_batch):
+                for data, labels in train_loader:
+                    ctx_data = data.as_in_context(self.ctx[0]).astype('float32')
+                    with mx.autograd.record():
+                        out = self.model(ctx_data)
+                        loss = L(out, labels.astype('float32').as_in_context(self.ctx[0]))
+                        loss.backward()
+                        passed += len(out)
+                    trainer.step(len(data))
+                    train_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
+                    train_metric.update(labels, out)
+            _, train_acc = train_metric.get()
+            train_loss /= num_batch
             epoch_time = time.time() - tic
-            print('[Epoch: {}] time: {}'.format(i, epoch_time))
-        
+            print('[Epoch::{:03d}] time::{:.1f} | MSE_metric::{:.4f} | MES_loss::{:.4f}'.format(
+                i, 
+                epoch_time,
+                train_acc,
+                train_loss
+            ))
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str)
     opt = parser.parse_args()
     trainer = ProteinAbundanceTrainer(opt.config)
-    trainer.data_loader.info()
+    # trainer.data_loader.info()
     trainer.train_loop()
     
     

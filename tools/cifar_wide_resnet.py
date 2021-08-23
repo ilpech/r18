@@ -67,16 +67,6 @@ class WideResNet(HybridBlock):
         super(WideResNet, self).__init__(**kwargs)
         assert len(layers) == len(channels) - 1
         with self.name_scope():
-            # self.features_extractor = nn.HybridSequential(prefix='')
-            # self.features_extractor.add(nn.BatchNorm(scale=False, center=False))
-            # self.features_extractor.add(nn.Conv2D(channels[0], 3, 1, 1, use_bias=False))
-            # self.features_extractor.add(nn.BatchNorm())
-            # in_channels = channels[0]
-            # for i, num_layer in enumerate(layers):
-            #     stride = 1 if i == 0 else 2
-            #     self.features_extractor.add(self._make_layer(block, num_layer, channels[i+1], drop_rate,
-            #                                        stride, i+1, in_channels=in_channels))
-            #     in_channels = channels[i+1]
             self.features_extractor = WideResNet.get_fe(block, layers, channels, drop_rate)
             self.bn = nn.BatchNorm()
             self.features_to_dense = nn.HybridSequential(prefix='')
