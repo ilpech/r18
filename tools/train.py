@@ -114,7 +114,8 @@ class ProteinAbundanceTrainer:
         self.wd = self.train_settings['wd']
         self.momentum = self.train_settings['momentum']
         self.optimizer = self.train_settings['optimizer']
-        self.net_name = 'resnetregr.001' 
+        self.net_name = 'resnetregr.001'
+        self.params_path = '../trained/{}'.format(self.net_name)
         num_layers=16
         width_factor=2.0
         assert (num_layers - 4) % 6 == 0
@@ -152,7 +153,7 @@ class ProteinAbundanceTrainer:
         #     self.input_shape_cwh[2])
         # )
         # self.net(sample_img)
-        self.net.export(self.net_name, epoch=epoch)
+        self.model.export(self.net_name, epoch=epoch)
         self.weights_path = '{}-{:04d}.params'.format(self.net_name, epoch)
         self.sym_path = '{}-symbol.json'.format(self.net_name)
         # if self.dict_path != None:
@@ -160,6 +161,35 @@ class ProteinAbundanceTrainer:
         #     print('dict copied in export dir')
         print('Network was successfully exported at', exp_dir)
         os.chdir(cwd)
+
+    def load_exported(self, sym_path='', params_path=''):
+        """
+        load model
+        self.sym_path and self.params_path are using if given are not exist
+        """
+        if not os.path.isfile(params_path):
+            print(self.weights_path)
+            def_w_p = os.path.join(self.params_path, self.weights_path)
+            if os.path.isfile(os.path.join(self.params_path, self.weights_path)):
+                params_path = os.path.join(self.params_path, self.weights_path)
+                print('params path from config used')
+            else:
+                print('Check params path', params_path)
+                raise FileNotFoundError(params_path)
+        if not os.path.isfile(sym_path):
+            print('Check sym path', sym_path)
+            if os.path.isfile(os.path.join(self.params_path, self.sym_path)):
+                sym_path = os.path.join(self.params_path, self.sym_path)
+                print('sym path from config used')
+            else:
+                print('Check sym path', sym_path)
+                raise FileNotFoundError(sym_path)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.net = gluon.nn.SymbolBlock.imports(sym_path, ['data'], params_path, ctx=self.ctx)
+            self.sym_path = sym_path
+            self.params_path = params_path
         
 
     def train_loop(self):
@@ -219,24 +249,29 @@ class ProteinAbundanceTrainer:
                 except:
                     pass
         data_cnt = len(labels)
-        data2val = roundUp(data_cnt/5)
+        data2val_cnt = roundUp(data_cnt/5)
         max_label = np.max(labels)
         norm_labels = [float(x/max_label) for x in labels]
-        data_norm_labels = mx.nd.array(zip(data, norm_labels))
-        data_norm_labels = mx.nd.random.shuffle(data_norm_labels) 
-        data_batch = mx.gluon.data.dataset.ArrayDataset(data_norm_labels)
-        # data_batch = mx.gluon.data.dataset.ArrayDataset(data, norm_labels)
-        print(data_batch)
+        # data_norm_labels = np.array([data, norm_labels])
+        # print(da)
+        # data_norm_labels = mx.nd.random.shuffle(data_norm_labels) 
+        # data_batch = mx.gluon.data.dataset.ArrayDataset(data_norm_labels)
+        data2train = mx.gluon.data.dataset.ArrayDataset(data[data2val_cnt:], norm_labels[data2val_cnt:])
+        data2val = mx.gluon.data.dataset.ArrayDataset(data[:data2val_cnt], norm_labels[:data2val_cnt])
+        # print(data_batch)
         # data_batch = mx.nd.random.shuffle(data_batch)
         batch_size = 5
-        data_train = data_batch[data2val:]
-        data_val = data_batch[:data2val]
-        debug(len(data_batch))
-        debug(len(data_train))
-        debug(len(data_val))
-        exit()
-        train_loader = mx.gluon.data.DataLoader(data_train, batch_size=batch_size, shuffle=True)
-        val_loader = mx.gluon.data.DataLoader(data_val, batch_size=batch_size, shuffle=True)
+        # data_train = data_batch[data2val_cnt:]
+        # data_val = data_batch[:data2val_cnt]
+        debug(data_cnt)
+        debug(len(data2train[0]))
+        debug(len(data2val[0]))
+        debug(len(data2train))
+        debug(len(data2val))
+        # print('exit')
+        # exit()
+        train_loader = mx.gluon.data.DataLoader(data2train, batch_size=batch_size, shuffle=True)
+        val_loader = mx.gluon.data.DataLoader(data2val, batch_size=batch_size, shuffle=False)
         genes_exps_batches = mx.nd.array(genes_exps_batches)
         L = mx.gluon.loss.L2Loss()
         num_batch = roundUp(len(labels)/batch_size)
@@ -248,12 +283,15 @@ class ProteinAbundanceTrainer:
             val_metric.reset()
             train_loss = 0
             passed = 0
-            while passed < len(data_batch):
+            while passed < data_cnt:
                 for data, labels in train_loader:
                     ctx_data = data.as_in_context(self.ctx[0]).astype('float32')
                     with mx.autograd.record():
                         out = self.model(ctx_data)
-                        loss = L(out, labels.astype('float32').as_in_context(self.ctx[0]))
+                        loss = L(
+                            out, 
+                            labels.astype('float32').as_in_context(self.ctx[0])
+                        )
                         loss.backward()
                         passed += len(out)
                     trainer.step(len(data))
@@ -264,17 +302,17 @@ class ProteinAbundanceTrainer:
                     out = self.model(ctx_data)
                     val_metric.update(labels, out)
             _, train_acc = train_metric.get()
-            _, val_acc = train_metric.get()
+            _, val_acc = val_metric.get()
             train_loss /= num_batch
             epoch_time = time.time() - tic
             msg = '[Epoch::{:03d}] time::{:.1f} \n'\
-                  '| MSE_metric::{:.8f} \n'\
-                  '| (train)MSE_metric::{:.8f} \n'\
-                  '| (train)MES_loss::{:.8f}'.format(
+                  '| (val)::MSE_metric::{:.8f} \n'\
+                  '| (train)::MSE_metric::{:.8f} \n'\
+                  '| (train)::MES_loss::{:.8f}'.format(
                   i, 
                   epoch_time,
-                  1-val_acc,
-                  1-train_acc,
+                  val_acc,
+                  train_acc,
                   train_loss
             )
             print(msg)
