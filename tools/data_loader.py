@@ -322,8 +322,9 @@ class DataLoader:
             databases2use.append(x)
         genes_exps_batches = []
         for j, gene in enumerate(self.genes):
-            if j >= lim_ifdebug:
-                break
+            if isdebug:
+                if j >= lim_ifdebug:
+                    break
             print('gene {} of {}'.format(j, len(self.genes)))
             all_databases_gene_data = [x[j] for x in databases_data]
             genes_exps_batches.append(
