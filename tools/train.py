@@ -277,6 +277,8 @@ class ProteinAbundanceTrainer:
         num_batch = roundUp(len(labels)/batch_size)
         train_metric = mx.metric.MSE()
         val_metric = mx.metric.MSE()
+        best_epoch = None
+        min_val_error = None
         for i in range(self.epochs):
             tic = time.time()
             train_metric.reset()
@@ -303,6 +305,14 @@ class ProteinAbundanceTrainer:
                     val_metric.update(labels, out)
             _, train_acc = train_metric.get()
             _, val_acc = val_metric.get()
+            new_best_val = False
+            if not min_val_error:
+                min_val_error = val_acc
+            else:
+                if abs(val_acc) < min_val_error:
+                    min_val_error = val_acc
+                    new_best_val = True
+                    best_epoch = i + 1
             train_loss /= num_batch
             epoch_time = time.time() - tic
             msg = '[Epoch::{:03d}] time::{:.1f} \n'\
@@ -316,8 +326,12 @@ class ProteinAbundanceTrainer:
                   train_loss
             )
             print(msg)
-            if not i % 10:
+            if not i % 10 or (i > 30 and new_best_val):
+                if new_best_val:
+                    print('new best val')
                 self.export_nn(i+1, '../trained')
+            if min_val_error and not new_best_val:
+                print('best val was at epoch({})::{:.8f}'.format(best_epoch, min_val_error))
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

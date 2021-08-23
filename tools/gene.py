@@ -7,7 +7,8 @@ from uniprot_api import getGeneFromApi, sequence
 class Gene:
     def __init__(
         self,
-        uniprot_id
+        uniprot_id,
+        only_w_values=False
     ):
         self.id_uniprot: str = uniprot_id
         # print('created gene: ', self.id_uniprot)
@@ -31,6 +32,7 @@ class Gene:
         self.chromosome_pos: str = None # locus
         self.nextprot_status = None
         self.peptide_seq = None
+        self.only_w_values = only_w_values
         
     def id(self):
         return self.id_uniprot
@@ -45,23 +47,23 @@ class Gene:
         copies_column = 'Copies of protein per cell'
         prot_1d_id = [i for i in range(len(prot_1d_names)) if prot_1d_names[i] == self.id_uniprot]
         prot_2d_id = [i for i in range(len(prot_1d_names)) if prot_2d_names[i] == self.id_uniprot]
-        if len(prot_1d_id) == 0:
-            # print('error while trying to find protein1D with id {}'.format(self.id_uniprot))
+        if not len(prot_1d_id):
+            if self.only_w_values:
+                raise Exception('gene(only_w_values)::error while trying to find protein1D with id {}'.format(self.id_uniprot))
             self.protein_copies_per_cell_2D = -1.0
         else:
-            prot_1d_id = prot_1d_id[0]
-            self.protein_copies_per_cell_1D = float(prot1D[copies_column][prot_1d_id])
-        if len(prot_2d_id) == 0:
-            # print('error while trying to find protein2D with id {}'.format(self.id_uniprot))
+            self.protein_copies_per_cell_1D = float(prot1D[copies_column][prot_1d_id[0]])
+        if not len(prot_2d_id):
+            if self.only_w_values:
+                raise Exception('gene(only_w_values)::error! no protein2D with id {}'.format(self.id_uniprot))
             self.protein_copies_per_cell_1D = -1.0
         else:
-            prot_2d_id = prot_2d_id[0]
-            self.protein_copies_per_cell_2D = float(prot2D[copies_column][prot_2d_id])
+            self.protein_copies_per_cell_2D = float(prot2D[copies_column][prot_2d_id[0]])
     
     def addRNAReport(self, rna_data):
         gene_names = rna_data['Uniprot AC']
         gene_id = [i for i in range(len(gene_names)) if gene_names[i] == self.id_uniprot]
-        if len(gene_id) == 0:
+        if not len(gene_id):
             raise Exception('error while trying to find rna with id {}'.format(self.id_uniprot))
         gene_id = gene_id[0]
         self.gene_name = gene_names[gene_id]
@@ -82,6 +84,11 @@ class Gene:
                 if s in k:
                     m_out = rna_data[k][gene_id]
                     if isinstance(m_out, str):
+                        if self.only_w_values:
+                            raise Exception('gene(only_w_values)::error! RNA={} with id {}'.format(
+                                m_out,
+                                self.id_uniprot
+                            ))
                         m_out = -1.0
                     self.rna_measurements[k] = m_out
                     break

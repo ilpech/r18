@@ -34,7 +34,8 @@ from tools import (
     norm_shifted_log,
     denorm_shifted_log,
     list2nonEmptyIds,
-    listfind
+    listfind,
+    is_number
 )
 from gene_mapping import (
     mapping2dict, 
@@ -138,13 +139,20 @@ class DataLoader:
         self.genes: List[Gene] = []
         print('creating genes')
         for gene_id in self.gene_ids:
-            gene = Gene(gene_id)
-            gene.addRNAReport(self.rna_data)
-            gene.addProteinAbundanceReport(
-                self.prot1D_data,
-                self.prot2D_data
-            )
-            self.genes.append(gene)
+            try:
+                gene = Gene(
+                    gene_id,
+                    only_w_values=True
+                )
+                gene.addRNAReport(self.rna_data)
+                gene.addProteinAbundanceReport(
+                    self.prot1D_data,
+                    self.prot2D_data
+                )
+                self.genes.append(gene)
+            except Exception as e:
+                print(e)
+                pass
         print('{} genes created'.format(len(self.genes)))
     
     def gene(self, upirot_gene_id):
@@ -295,6 +303,49 @@ class DataLoader:
         print('max seq', max_seq, len(max_seq))
         print('max set seq', max_set_seq, len(max_set_seq))
     
+    def data(self):
+        databases = uniq_nonempty_uniprot_mapping_header()
+        databases_data = []
+        databases2use =[]
+        for x in databases:
+            mtrx = self.data_loader.mappingDatabase2matrix(x)
+            if not mtrx.shape[1]:
+                continue
+            databases_data.append(mtrx)
+            databases2use.append(x)
+        genes_exps_batches = []
+        prot1d = [
+            x for x in dataloader.genes \
+            if is_number(x.protein_copies_per_cell_1D) and x.protein_copies_per_cell_1D > 0
+        ]
+        prot2d = [
+            x.protein_copies_per_cell_2D for x in dataloader.genes \
+            if is_number(x.protein_copies_per_cell_2D) and x.protein_copies_per_cell_2D > 0
+        ]
+        for j, gene in enumerate(self.data_loader.genes):
+            print('gene {} of {}'.format(j, len(self.data_loader.genes)))
+            all_databases_gene_data = [x[j] for x in databases_data]
+            genes_exps_batches.append(
+                self.data_loader.gene2sampleExperimentHasId(
+                    gene.id_uniprot, 
+                    all_databases_gene_data,
+                    databases2use,
+                    max_measures
+                )
+            )
+        data = []
+        labels = []
+        for gene_id in range(len(genes_exps_batches)):
+            gene = self.data_loader.genes[gene_id] # проверить точно ли правильная индексация?
+            for exp_id in range(len(genes_exps_batches[gene_id])):
+                try:
+                    if not is_number(gene.protein_copies_per_cell_1D):
+                        continue
+                    data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
+                    labels.append(gene.protein_copies_per_cell_1D)
+                except:
+                    pass
+    
     def info(self):
         for gene in self.genes:
             print('============', gene.id_uniprot)
@@ -324,6 +375,17 @@ if __name__ == '__main__':
     databases = uniq_nonempty_uniprot_mapping_header()
     databases_data = []
     databases2use =[]
+    a1 = [x.protein_copies_per_cell_1D for x in dataloader.genes if is_number(x.protein_copies_per_cell_1D) and x.protein_copies_per_cell_1D > 0]
+    a2 = [x.protein_copies_per_cell_2D for x in dataloader.genes if is_number(x.protein_copies_per_cell_2D) and x.protein_copies_per_cell_2D > 0]
+    print('1d')
+    for a in a1:
+        print(a)
+    print('2d')
+    for a in a1:
+        print(a)
+    print('good prots 1d', len(a1))
+    print('good prots 2d', len(a2))
+    exit(0)
     for x in databases:
         mtrx = dataloader.mappingDatabase2matrix(x)
         if not mtrx.shape[1]:
