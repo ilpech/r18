@@ -261,7 +261,7 @@ class ProteinAbundanceTrainer:
         num_batch = roundUp(len(labels)/batch_size)
         train_metric = mx.metric.MSE()
         val_metric = mx.metric.MSE()
-        best_epoch = None
+        best_epoch = 0
         min_val_error = None
         for i in range(1, self.epochs):
             tic = time.time()
