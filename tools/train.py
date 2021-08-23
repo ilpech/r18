@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import mxnet as mx
+import shutil
 from data_loader import DataLoader
 import argparse
 from tools import str2bool
@@ -18,7 +19,8 @@ from tools import (
     denorm_shifted_log,
     list2nonEmptyIds,
     listfind,
-    is_number
+    is_number,
+    ensure_folder
 )
 from gene_mapping import (
     mapping2dict, 
@@ -111,7 +113,8 @@ class ProteinAbundanceTrainer:
         self.log_interval = self.train_settings['log_interval']
         self.wd = self.train_settings['wd']
         self.momentum = self.train_settings['momentum']
-        self.optimizer = self.train_settings['optimizer'] 
+        self.optimizer = self.train_settings['optimizer']
+        self.net_name = 'resnetregr.001' 
         num_layers=16
         width_factor=2.0
         assert (num_layers - 4) % 6 == 0
@@ -124,6 +127,40 @@ class ProteinAbundanceTrainer:
             1, 
             drop_rate=0.0
         )
+
+    def save_checkpoint(self, params_path, epoch):
+        cwd = os.getcwd()
+        os.chdir(params_path)
+        export_name = '{}_{:03d}.params'.format(self.net_name, epoch)
+        self.model.save_parameters(export_name)
+        # !realize
+        # self.write_config('.')
+        os.chdir(cwd)
+    
+    def export_nn(self, epoch, export_path=None):
+        if export_path == None:
+            export_path = os.path.join(self.params_path, '..')
+        exp_dir = os.path.join(export_path, 'exported', self.net_name)
+        cwd = os.getcwd()
+        ensure_folder(exp_dir)
+        os.chdir(exp_dir)
+        # self.net.hybridize()
+        # sample_img = mx.nd.ones((
+        #     1,
+        #     self.input_shape_cwh[0],
+        #     self.input_shape_cwh[1],
+        #     self.input_shape_cwh[2])
+        # )
+        # self.net(sample_img)
+        self.net.export(self.net_name, epoch=epoch)
+        self.weights_path = '{}-{:04d}.params'.format(self.net_name, epoch)
+        self.sym_path = '{}-symbol.json'.format(self.net_name)
+        # if self.dict_path != None:
+        #     shutil.copy(self.dict_path, '.')
+        #     print('dict copied in export dir')
+        print('Network was successfully exported at', exp_dir)
+        os.chdir(cwd)
+        
 
     def train_loop(self):
         lrs = [v for _,v in self.lr_settings.items()]
@@ -182,18 +219,33 @@ class ProteinAbundanceTrainer:
                 except:
                     pass
         data_cnt = len(labels)
+        data2val = roundUp(data_cnt/5)
         max_label = np.max(labels)
         norm_labels = [float(x/max_label) for x in labels]
-        data_batch = mx.gluon.data.dataset.ArrayDataset(data, norm_labels)
+        data_norm_labels = mx.nd.array(zip(data, norm_labels))
+        data_norm_labels = mx.nd.random.shuffle(data_norm_labels) 
+        data_batch = mx.gluon.data.dataset.ArrayDataset(data_norm_labels)
+        # data_batch = mx.gluon.data.dataset.ArrayDataset(data, norm_labels)
+        print(data_batch)
+        # data_batch = mx.nd.random.shuffle(data_batch)
         batch_size = 5
-        train_loader = mx.gluon.data.DataLoader(data_batch, batch_size=batch_size, shuffle=True)
+        data_train = data_batch[data2val:]
+        data_val = data_batch[:data2val]
+        debug(len(data_batch))
+        debug(len(data_train))
+        debug(len(data_val))
+        exit()
+        train_loader = mx.gluon.data.DataLoader(data_train, batch_size=batch_size, shuffle=True)
+        val_loader = mx.gluon.data.DataLoader(data_val, batch_size=batch_size, shuffle=True)
         genes_exps_batches = mx.nd.array(genes_exps_batches)
         L = mx.gluon.loss.L2Loss()
         num_batch = roundUp(len(labels)/batch_size)
         train_metric = mx.metric.MSE()
+        val_metric = mx.metric.MSE()
         for i in range(self.epochs):
             tic = time.time()
             train_metric.reset()
+            val_metric.reset()
             train_loss = 0
             passed = 0
             while passed < len(data_batch):
@@ -207,15 +259,27 @@ class ProteinAbundanceTrainer:
                     trainer.step(len(data))
                     train_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
                     train_metric.update(labels, out)
+                for data, labels in val_loader:
+                    ctx_data = data.as_in_context(self.ctx[0]).astype('float32')
+                    out = self.model(ctx_data)
+                    val_metric.update(labels, out)
             _, train_acc = train_metric.get()
+            _, val_acc = train_metric.get()
             train_loss /= num_batch
             epoch_time = time.time() - tic
-            print('[Epoch::{:03d}] time::{:.1f} | MSE_metric::{:.4f} | MES_loss::{:.4f}'.format(
-                i, 
-                epoch_time,
-                train_acc,
-                train_loss
-            ))
+            msg = '[Epoch::{:03d}] time::{:.1f} \n'\
+                  '| MSE_metric::{:.8f} \n'\
+                  '| (train)MSE_metric::{:.8f} \n'\
+                  '| (train)MES_loss::{:.8f}'.format(
+                  i, 
+                  epoch_time,
+                  1-val_acc,
+                  1-train_acc,
+                  train_loss
+            )
+            print(msg)
+            if not i % 10:
+                self.export_nn(i+1, '../trained')
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
