@@ -17,7 +17,8 @@ from tools import (
     norm_shifted_log,
     denorm_shifted_log,
     list2nonEmptyIds,
-    listfind
+    listfind,
+    is_number
 )
 from gene_mapping import (
     mapping2dict, 
@@ -25,7 +26,8 @@ from gene_mapping import (
     uniq_nonempty_uniprot_mapping_header
 )
 
-isdebug = False
+isdebug = True
+# isdebug = False
 
 class RegressionResNet(HybridBlock):
     def __init__(self, block, layers, channels, drop_rate, **kwargs):
@@ -173,6 +175,8 @@ class ProteinAbundanceTrainer:
             gene = self.data_loader.genes[gene_id] # проверить точно ли правильная индексация?
             for exp_id in range(len(genes_exps_batches[gene_id])):
                 try:
+                    if not is_number(gene.protein_copies_per_cell_1D):
+                        continue
                     data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
                     labels.append(gene.protein_copies_per_cell_1D)
                 except:
