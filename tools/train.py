@@ -28,8 +28,8 @@ from gene_mapping import (
     uniq_nonempty_uniprot_mapping_header
 )
 
-# isdebug = True
-isdebug = False
+isdebug = True
+# isdebug = False
 
 class RegressionResNet(HybridBlock):
     def __init__(self, block, layers, channels, drop_rate, **kwargs):
@@ -285,10 +285,10 @@ class ProteinAbundanceTrainer:
                     trainer.step(len(data))
                     train_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
                     train_metric.update(labels, out)
-                for data, labels in val_loader:
-                    ctx_data = data.as_in_context(self.ctx[0]).astype('float32')
-                    out = self.model(ctx_data)
-                    val_metric.update(labels, out)
+            for data, labels in val_loader:
+                ctx_data = data.as_in_context(self.ctx[0]).astype('float32')
+                out = self.model(ctx_data)
+                val_metric.update(labels, out)
             _, train_acc = train_metric.get()
             _, val_acc = val_metric.get()
             new_best_val = False

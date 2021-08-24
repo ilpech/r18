@@ -194,13 +194,15 @@ class DataLoader:
                 int(DataLoader.magic_consts.protein_amino_acids_size)
             )
         )
-        gene_experiments_batches = [batch] * experiments_size
+        gene_experiments_batches = [batch.copy()] * experiments_size
         experiments_alph = sorted([e for e,_ in gene.rna_measurements.items()])
         gene_seq_onehot = gene.apiSeqOneHot()
         onehot_rows = gene_seq_onehot.shape[0]
         if onehot_rows > variable_length_layer_size:
            onehot_rows = variable_length_layer_size
         api_seq = gene.apiSequence()
+        # !error rna experiment id is always 17
+        # exit(0)
         for i in range(experiments_size):
             exp = experiments_alph[i]
             value = gene.rna_measurements[exp]
@@ -208,7 +210,8 @@ class DataLoader:
             # first channel is fullfilled with rna experiment value
             gene_experiments_batches[i][0].fill(norm_value)
             # second channel is fullfilled with rna experiment id
-            gene_experiments_batches[i][1].fill(i)
+            id2fill_exp = i
+            gene_experiments_batches[i][1].fill(id2fill_exp)
             # third channel is filled by gene seq in onehot representation
             if onehot_rows:
                 gene_experiments_batches[i][2][:onehot_rows] = gene_seq_onehot[:onehot_rows]
@@ -235,6 +238,12 @@ class DataLoader:
                 gene.id()
             ) 
         )
+        # !error handling
+        # for i in range(len(gene_experiments_batches)):
+            # debug(i)
+            # debug(np.mean(gene_experiments_batches[i][1]))
+            # exit()
+        # exit()
         return gene_experiments_batches            
     
     def dataFromMappingDatabase(self, db_name, gene_name):
@@ -349,6 +358,16 @@ class DataLoader:
                     pass
         labels, shuffle_indxs = shuffle(labels)
         data = setindxs(data, shuffle_indxs)
+        # !error handling
+        # for d in data:
+        #     debug(d.shape)
+        #     # debug(d[0][0])
+        #     # debug(d[0][0].shape)
+        #     debug(np.mean(d[0]))
+        #     debug(np.mean(d[1]))
+        #     debug(np.sum(d[2]))
+        #     exit(0)
+        #     # debug(d[2][0])
         return data, labels
     
     def info(self):
@@ -367,6 +386,18 @@ class DataLoader:
             print(self.mapping[gene.id()]['GO'])
             print('Ensembl keywords::')
             print(self.mapping[gene.id()]['Ensembl'])
+            
+    def uniprot2ensg(self, uniprot_gene_id):
+        return self.dataFromMappingDatabase('Ensembl', uniprot_gene_id)
+    
+    def uniprot2db(self, uniprot_gene_id, db2convert_name):
+        try:
+            return self.dataFromMappingDatabase(db2convert_name, uniprot_gene_id)
+        except:
+            raise Exception('error finding mapping Uniprot::{} ==> {} database'.format(
+                uniprot_gene_id,
+                db2convert_name
+            ))
 
 if __name__ == '__main__':
     dataloader = DataLoader('../config/train.yaml')
@@ -378,6 +409,14 @@ if __name__ == '__main__':
     # ensembl_onehot = dataloader.mappingDatabase2oneHot('Ensembl')
     max_measures=dataloader.maxRnaMeasurementsInData()
     databases = uniq_nonempty_uniprot_mapping_header()
+    ensg_id = dataloader.uniprot2ensg(dataloader.genes[0].id())
+    print(ensg_id)
+    exit()
+    for x in databases:
+        print(x, dataloader.genes[0].id())
+        data = dataloader.uniprot2db(dataloader.genes[0].id(), x)
+        print(data)
+    exit(0)
     databases_data = []
     databases2use =[]
     a1 = [x.protein_copies_per_cell_1D for x in dataloader.genes if is_number(x.protein_copies_per_cell_1D) and x.protein_copies_per_cell_1D > 0]
