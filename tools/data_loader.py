@@ -138,7 +138,7 @@ class DataLoader:
         print('reading mapping', self.gene_mapping_path)
         self.mapping = mapping2dict(self.gene_mapping_path)
         self.gene_ids = [x for x in self.rna_data['Uniprot AC'] if isinstance(x, str)]
-        self.genes: List[Gene] = []
+        self.__genes: List[Gene] = []
         print('creating genes')
         for gene_id in self.gene_ids:
             try:
@@ -151,21 +151,24 @@ class DataLoader:
                     self.prot1D_data,
                     self.prot2D_data
                 )
-                self.genes.append(gene)
+                self.genes().append(gene)
             except Exception as e:
                 print(e)
                 pass
-        print('{} genes created'.format(len(self.genes)))
+        print('{} genes created'.format(len(self.genes())))
+    
+    def genes(self):
+        return self.__genes
     
     def gene(self, upirot_gene_id):
-        gene_ids = [i for i in range(len(self.genes)) if self.genes[i].id() == upirot_gene_id]
+        gene_ids = [i for i in range(len(self.genes())) if self.genes()[i].id() == upirot_gene_id]
         if not gene_ids:
            raise Exception('gene::gene {} not found'.format(upirot_gene_id))
-        return self.genes[gene_ids[0]], gene_ids[0]
+        return self.genes()[gene_ids[0]], gene_ids[0]
     
     def maxRnaMeasurementsInData(self):
         m = 0
-        for g in self.genes:
+        for g in self.genes():
             exps = len(g.rna_measurements)
             if exps > m:
                 m = exps
@@ -257,8 +260,8 @@ class DataLoader:
     
     def mappingDatabaseAlphabet(self, db_name):
         uniq_data = []
-        for i in range(len(self.genes)):
-            db_gene_data = self.dataFromMappingDatabase(db_name, self.genes[i].id_uniprot)
+        for i in range(len(self.genes())):
+            db_gene_data = self.dataFromMappingDatabase(db_name, self.genes()[i].id_uniprot)
             for data in db_gene_data:
                 if data not in uniq_data:
                     uniq_data.append(data) 
@@ -283,13 +286,13 @@ class DataLoader:
         '''
         genes_data = []
         uniq_data = []
-        for i in range(len(self.genes)):
-            db_gene_data = self.dataFromMappingDatabase(db_name, self.genes[i].id_uniprot)
+        for i in range(len(self.genes())):
+            db_gene_data = self.dataFromMappingDatabase(db_name, self.genes()[i].id_uniprot)
             genes_data.append(db_gene_data)
             for data in db_gene_data:
                 if data not in uniq_data:
                     uniq_data.append(data) 
-        genes_onehot_vectors = [[0] * len(uniq_data)] * len(self.genes)
+        genes_onehot_vectors = [[0] * len(uniq_data)] * len(self.genes())
         npa = np.array(genes_onehot_vectors)
         sorted_uniq = sorted(uniq_data)
         for i in range(len(genes_data)):
@@ -303,7 +306,7 @@ class DataLoader:
     def sequencesAnalys(self):
         max_seq = None
         max_set_seq = None
-        for gene in self.genes:
+        for gene in self.genes():
             seq = sequence(gene.id())
             onehot = gene.apiSeqOneHot()
             set_seq = set(seq)
@@ -330,11 +333,11 @@ class DataLoader:
             databases_data.append(mtrx)
             databases2use.append(x)
         genes_exps_batches = []
-        for j, gene in enumerate(self.genes):
+        for j, gene in enumerate(self.genes()):
             if isdebug:
                 if j >= lim_ifdebug:
                     break
-            print('gene {} of {}'.format(j, len(self.genes)))
+            print('gene {} of {}'.format(j, len(self.genes())))
             all_databases_gene_data = [x[j] for x in databases_data]
             genes_exps_batches.append(
                 self.gene2sampleExperimentHasId(
@@ -347,7 +350,7 @@ class DataLoader:
         data = []
         labels = []
         for gene_id in range(len(genes_exps_batches)):
-            gene = self.genes[gene_id] # проверить точно ли правильная индексация?
+            gene = self.genes()[gene_id] # проверить точно ли правильная индексация?
             for exp_id in range(len(genes_exps_batches[gene_id])):
                 try:
                     if not is_number(gene.protein_copies_per_cell_1D):
@@ -371,7 +374,7 @@ class DataLoader:
         return data, labels
     
     def info(self):
-        for gene in self.genes:
+        for gene in self.genes():
             print('============', gene.id_uniprot)
             print(gene.protein_name)
             print(gene.nextprot_status)
@@ -398,9 +401,41 @@ class DataLoader:
                 uniprot_gene_id,
                 db2convert_name
             ))
+    
+    def loadTissue29data2genes(
+        self, 
+        rna_path, 
+        prot_path
+    ):
+        import csv
+        header = []
+        rna_data = []
+        tissues = []
+        gene_ensg_ids = []
+        id_col_name = None
+        with open(rna_path) as f:
+            reader = csv.DictReader(f, delimiter='\t')
+            if not len(header):
+                for rs in reader:
+                    for r in rs:
+                        header.append(r)
+                    break
+                id_col_name = header[0]
+                tissues = header[1:]
+            for ord_dict in reader:
+                gene_ensg_ids.append(ord_dict[id_col_name]) 
+                for t in tissues:
+                    rna_data.append(ord_dict[t])
+        for id_ in gene_ensg_ids:
+            print(id_)
+        print(len(gene_ensg_ids))
+        print('loadTissue29data2genes:: exit OK')
+        exit()
 
 if __name__ == '__main__':
     dataloader = DataLoader('../config/train.yaml')
+    dataloader.loadTissue29data2genes('../data/liver_hepg2/tissue29_rna.tsv',
+                                      '../data/liver_hepg2/tissue29_prot.tsv')
     # gi_onehot = dataloader.mappingDatabase2oneHot('GI')
     # go_onehot = dataloader.mappingDatabase2oneHot('GO')
     # pubmed_onehot = dataloader.mappingDatabase2oneHot('PubMed')

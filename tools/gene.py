@@ -22,6 +22,7 @@ class Gene:
         self.protein_copies_per_cell_2D: float = None
         self.protein_data = {}
         self.rna_measurements = {}
+        self.protein_measurements = {}
         # init by ion data
         self.compound: str = None
         # add other info from file
@@ -59,6 +60,8 @@ class Gene:
             self.protein_copies_per_cell_1D = -1.0
         else:
             self.protein_copies_per_cell_2D = float(prot2D[copies_column][prot_2d_id[0]])
+        self.protein_measurements['protein_copies_per_cell_1D'] = self.protein_copies_per_cell_1D 
+        self.protein_measurements['protein_copies_per_cell_2D'] = self.protein_copies_per_cell_2D 
     
     def addRNAReport(self, rna_data):
         gene_names = rna_data['Uniprot AC']
@@ -126,6 +129,7 @@ class Gene:
             pos = [j for j in range(len(alphabet)) if alphabet[j] == seq[i]][0]
             onehot[i][pos] = 1 #alphabet[j]
         return onehot
+        
 
 if __name__ == '__main__':
     data_path = '../data/liver_hepg2'
