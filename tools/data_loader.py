@@ -393,8 +393,9 @@ class DataLoader:
             mtrx, alph = self.mappingDatabase2matrix(x)
             if not mtrx.shape[1]:
                 continue
-            if len(alph) > max_db_alph:
-                max_db_alph = len(alph) 
+            l_alph = roundUp(len(alph)/20)
+            if l_alph > max_db_alph:
+                max_db_alph = l_alph
             databases_data.append(mtrx)
             databases2use.append(x)
         genes_exps_batches = []
