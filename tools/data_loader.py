@@ -340,8 +340,7 @@ class DataLoader:
             for data in db_gene_data:
                 if data not in uniq_data:
                     uniq_data.append(data) 
-        genes_onehot_vectors = [[0] * len(uniq_data)] * len(self.genes())
-        npa = np.array(genes_onehot_vectors)
+        npa = np.zeros(shape=(len(self.genes()), len(uniq_data)))
         sorted_uniq = sorted(uniq_data)
         for i in range(len(genes_data)):
             for j in range(len(sorted_uniq)):
