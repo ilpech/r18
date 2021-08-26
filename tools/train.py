@@ -20,7 +20,9 @@ from tools import (
     list2nonEmptyIds,
     listfind,
     is_number,
-    ensure_folder
+    ensure_folder,
+    shuffle,
+    setindxs
 )
 from gene_mapping import (
     mapping2dict, 
@@ -129,8 +131,8 @@ class ProteinAbundanceTrainer:
         self.logger = TrainLogger(self.log_path)
         self.data_loader = DataLoader(config_path)
         self.data_loader.loadTissue29data2genes(
-            '../data/liver_hepg2/tissue29.5k_rna.tsv',
-            '../data/liver_hepg2/tissue29.5k_prot.tsv',
+            '../data/liver_hepg2/tissue29.1k_rna.tsv',
+            '../data/liver_hepg2/tissue29.1k_prot.tsv',
             create_new_genes=True,
             isdebug=isdebug
         )
@@ -238,45 +240,6 @@ class ProteinAbundanceTrainer:
             optimizer_params
         )
         databases = uniq_nonempty_uniprot_mapping_header()
-        # max_measures = self.data_loader.maxRnaMeasurementsInData()
-        # if isdebug:
-        #     databases = databases[:3]
-        # databases_data = []
-        # databases2use =[]
-        # for x in databases:
-        #     mtrx = self.data_loader.mappingDatabase2matrix(x)
-        #     if not mtrx.shape[1]:
-        #         continue
-        #     databases_data.append(mtrx)
-        #     databases2use.append(x)
-        # genes_exps_batches = []
-        # for j, gene in enumerate(self.data_loader.genes):
-        #     if isdebug:
-        #         if j >= 3:
-        #             print('debug::genes::', j)
-        #             break
-        #     print('gene {} of {}'.format(j, len(self.data_loader.genes)))
-        #     all_databases_gene_data = [x[j] for x in databases_data]
-        #     genes_exps_batches.append(
-        #         self.data_loader.gene2sampleExperimentHasId(
-        #             gene.id_uniprot, 
-        #             all_databases_gene_data,
-        #             databases2use,
-        #             max_measures
-        #         )
-        #     )
-        # data = []
-        # labels = []
-        # for gene_id in range(len(genes_exps_batches)):
-        #     gene = self.data_loader.genes[gene_id] # проверить точно ли правильная индексация?
-        #     for exp_id in range(len(genes_exps_batches[gene_id])):
-        #         try:
-        #             if not is_number(gene.protein_copies_per_cell_1D):
-        #                 continue
-        #             data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
-        #             labels.append(gene.protein_copies_per_cell_1D)
-        #         except:
-        #             pass
         data, labels = self.data_loader.data(isdebug)
         data_cnt = len(labels)
         data2val_cnt = roundUp(data_cnt/5)
@@ -300,6 +263,8 @@ class ProteinAbundanceTrainer:
         min_val_error = None
         first_forward = True
         for i in range(1, self.epochs):
+            # labels, shuffle_indxs = shuffle(labels)
+            # data = setindxs(data, shuffle_indxs)
             tic = time.time()
             train_metric.reset()
             val_metric.reset()

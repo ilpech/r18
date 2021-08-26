@@ -333,7 +333,11 @@ class DataLoader:
         reshape = np.reshape(reshape, (onehot.shape[0], uniq_size, cols))
         return reshape, alph
     
-    def mappingDatabase2oneHot(self, db_name):
+    def mappingDatabase2oneHot(
+        self, 
+        db_name,
+        outpath='../data/mapping_out'
+    ):
         '''
         returns onehotvector, db_mapping_alphabet
         '''
