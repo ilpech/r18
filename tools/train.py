@@ -184,12 +184,13 @@ class ProteinAbundanceTrainer:
             export_path = os.path.join(self.params_path, '..')
         exp_dir = os.path.join(export_path, self.net_name)
         cwd = os.getcwd()
-        ensure_folder(exp_dir)
+        if not os.path.isdir(exp_dir):
+            ensure_folder(exp_dir)
         os.chdir(exp_dir)
         self.model.export(self.net_name, epoch=epoch)
         self.weights_path = '{}-{:04d}.params'.format(self.net_name, epoch)
         self.sym_path = '{}-symbol.json'.format(self.net_name)
-        self.logger.print('Network was successfully exported at', exp_dir)
+        self.logger.print('Network was successfully exported at {}'.format(exp_dir))
         os.chdir(cwd)
 
     def load_exported(self, sym_path='', params_path=''):
@@ -229,7 +230,10 @@ class ProteinAbundanceTrainer:
 
     def train_loop(self):
         lrs = [v for _,v in self.lr_settings.items()]
-        self.model.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=self.ctx[0])
+        self.model.collect_params().initialize(
+            mx.init.Xavier(magnitude=2.24), 
+            ctx=self.ctx[0]
+        )
         self.model.collect_params().reset_ctx(self.ctx[0])
         self.model.hybridize()
         optimizer_params = {
@@ -261,7 +265,9 @@ class ProteinAbundanceTrainer:
         L = mx.gluon.loss.L2Loss()
         num_batch = roundUp(len(labels)/batch_size)
         train_metric = mx.metric.MSE()
+        train_denorm_metric = mx.metric.MSE()
         val_metric = mx.metric.MSE()
+        val_denorm_metric = mx.metric.MSE()
         best_epoch = 0
         min_val_error = None
         first_forward = True
@@ -271,6 +277,8 @@ class ProteinAbundanceTrainer:
             tic = time.time()
             train_metric.reset()
             val_metric.reset()
+            train_denorm_metric.reset()
+            val_denorm_metric.reset()
             train_loss = 0
             passed = 0
             while passed < data_cnt:
@@ -290,10 +298,18 @@ class ProteinAbundanceTrainer:
                     trainer.step(len(data))
                     train_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
                     train_metric.update(labels, out)
+                    denorm_labels = mx.nd.array([denorm_shifted_log(x.asscalar()) for x in labels])
+                    denorm_out = mx.nd.array([denorm_shifted_log(x.asscalar()) for x in out])
+                    train_denorm_metric.update(denorm_labels, denorm_out)
             for data, labels in val_loader:
                 ctx_data = data.as_in_context(self.ctx[0]).astype('float32')
                 out = self.model(ctx_data)
                 val_metric.update(labels, out)
+                denorm_labels = mx.nd.array([denorm_shifted_log(x.asscalar()) for x in labels])
+                denorm_out = mx.nd.array([denorm_shifted_log(x.asscalar()) for x in out])
+                val_denorm_metric.update(denorm_labels, denorm_out)
+            _, train_denorm_acc = train_denorm_metric.get()
+            _, val_denorm_acc = val_denorm_metric.get()
             _, train_acc = train_metric.get()
             _, val_acc = val_metric.get()
             new_best_val = False
@@ -308,12 +324,16 @@ class ProteinAbundanceTrainer:
             epoch_time = time.time() - tic
             msg = '[Epoch::{:03d}] time::{:.1f} \n'\
                   '| (val)::MSE_metric::{:.8f} \n'\
+                  '| (val)::MSE_denorm_metric::{:.8f} \n'\
                   '| (train)::MSE_metric::{:.8f} \n'\
+                  '| (train)::MSE_denorm_metric::{:.8f} \n'\
                   '| (train)::MES_loss::{:.8f}'.format(
                   i, 
                   epoch_time,
                   val_acc,
+                  val_denorm_acc,
                   train_acc,
+                  train_denorm_acc,
                   train_loss
             )
             self.logger.print(msg)
