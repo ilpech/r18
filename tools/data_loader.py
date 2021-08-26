@@ -70,8 +70,10 @@ class DataLoader:
 
     @staticmethod
     def max_db2acids_size():
-        return DataLoader.magic_consts.max_database_alph_size/ \
-               DataLoader.magic_consts.protein_amino_acids_size 
+        return roundUp(
+            DataLoader.magic_consts.max_database_alph_size/ \
+            DataLoader.magic_consts.protein_amino_acids_size
+        )
         
     
     def _get_argparse(self):
@@ -319,18 +321,21 @@ class DataLoader:
         return len(self.mappingDatabaseAlphabet(db_name))
     
     def mappingDatabase2matrix(self, db_name, cols=20):
-        onehot = self.mappingDatabase2oneHot(db_name)
+        '''
+        returns onehotmatrix, db_mapping_alphabet
+        '''
+        onehot, alph = self.mappingDatabase2oneHot(db_name)
         uniq_size = roundUp(onehot.shape[1]/float(cols))
         reshape = np.zeros((onehot.shape[0], uniq_size, cols)).flatten()
         for gene_id in range(len(onehot)):
             for value_id in range(len(onehot[gene_id])):
                 reshape[len(onehot[gene_id])*gene_id + value_id] = onehot[gene_id][value_id]
         reshape = np.reshape(reshape, (onehot.shape[0], uniq_size, cols))
-        return reshape
+        return reshape, alph
     
     def mappingDatabase2oneHot(self, db_name):
         '''
-        returns [db_mapping_alphabet, onehotvector]
+        returns onehotvector, db_mapping_alphabet
         '''
         genes_data = []
         uniq_data = []
@@ -348,7 +353,7 @@ class DataLoader:
                 if len(found) > 0:
                     npa[i][j] = 1
         print('mappingDatabase2oneHot::{}::found shape {}'.format(db_name, npa.shape))
-        return npa
+        return npa, uniq_data
 
     def sequencesAnalys(self):
         max_seq = None
@@ -377,7 +382,7 @@ class DataLoader:
         databases_data = []
         databases2use =[]
         for x in databases:
-            mtrx = self.mappingDatabase2matrix(x)
+            mtrx, alph = self.mappingDatabase2matrix(x)
             if not mtrx.shape[1]:
                 continue
             databases_data.append(mtrx)
@@ -660,14 +665,13 @@ if __name__ == '__main__':
     # max_shape_orig = (0,0)
     # max_shape_name = ''
     for db_name in databases:
-        onehot_m = dataloader.mappingDatabase2matrix(db_name)
+        onehot_m, alph = dataloader.mappingDatabase2matrix(db_name)
         shape_s = onehot_m.flatten().shape[0]
         # if shape_s > max_shape:
         #     max_shape = shape_s
         #     max_shape_name = db_name
         #     max_shape_orig = onehot_m.shape
-        onehot = dataloader.mappingDatabase2oneHot(db_name)
-        alph = dataloader.mappingDatabaseAlphabet(db_name)
+        onehot, alph = dataloader.mappingDatabase2oneHot(db_name)
         print('=====\nDATABASE::',db_name)
         alph_size = len(alph)
         print('db alph size', alph_size)
