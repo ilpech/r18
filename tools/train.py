@@ -28,8 +28,8 @@ from gene_mapping import (
     uniq_nonempty_uniprot_mapping_header
 )
 
-isdebug = True
-# isdebug = False
+# isdebug = True
+isdebug = False
 
 class TrainLogger:
     def __init__(

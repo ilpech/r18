@@ -5,15 +5,10 @@ def uniq_nonempty_uniprot_mapping_header():
     return [
         'GO',
         'RefSeq',
-        'GI',
-        'PDB',
         'PIR',
         'MIM',
         'PubMed',
-        'EMBL',
-        'EMBL-CDS',
         'Ensembl_PRO',
-        'Additional PubMed'
     ]
     
 def uniprot_mapping_header():
@@ -22,7 +17,7 @@ def uniprot_mapping_header():
         'UniProtKB-ID',
         'GeneID (EntrezGene)',
         'RefSeq',
-        'GI',
+        'GI', # too big
         'PDB',
         'GO',
         'UniRef100',

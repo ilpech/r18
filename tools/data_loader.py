@@ -601,71 +601,71 @@ if __name__ == '__main__':
     # )
     # exit()
     dataloader = DataLoader('../config/train.yaml')
-    dataloader.loadTissue29data2genes(
-        '../data/liver_hepg2/tissue29_rna.tsv',
-        '../data/liver_hepg2/tissue29_prot.tsv',
-        create_new_genes=True,
-        isdebug=isdebug
-    )
-    exit(0)
-    # gi_onehot = dataloader.mappingDatabase2oneHot('GI')
-    # go_onehot = dataloader.mappingDatabase2oneHot('GO')
-    # pubmed_onehot = dataloader.mappingDatabase2oneHot('PubMed')
-    # mim_onehot = dataloader.mappingDatabase2oneHot('MIM')
-    # refseq_onehot = dataloader.mappingDatabase2oneHot('RefSeq')
-    # ensembl_onehot = dataloader.mappingDatabase2oneHot('Ensembl')
-    max_measures=dataloader.maxRnaMeasurementsInData()
-    databases = uniq_nonempty_uniprot_mapping_header()
-    ensg_id = dataloader.uniprot2ensg(dataloader.genes[0].id())
-    # print(ensg_id)
-    exit()
-    for x in databases:
-        print(x, dataloader.genes[0].id())
-        data = dataloader.uniprot2db(dataloader.genes[0].id(), x)
-        print(data)
-    exit(0)
-    databases_data = []
-    databases2use =[]
-    a1 = [x.protein_copies_per_cell_1D for x in dataloader.genes if is_number(x.protein_copies_per_cell_1D) and x.protein_copies_per_cell_1D > 0]
-    a2 = [x.protein_copies_per_cell_2D for x in dataloader.genes if is_number(x.protein_copies_per_cell_2D) and x.protein_copies_per_cell_2D > 0]
-    print('1d')
-    for a in a1:
-        print(a)
-    print('2d')
-    for a in a1:
-        print(a)
-    print('good prots 1d', len(a1))
-    print('good prots 2d', len(a2))
-    exit(0)
-    for x in databases:
-        mtrx = dataloader.mappingDatabase2matrix(x)
-        if not mtrx.shape[1]:
-            continue
-        databases_data.append(mtrx)
-        databases2use.append(x)
+    # dataloader.loadTissue29data2genes(
+    #     '../data/liver_hepg2/tissue29_rna.tsv',
+    #     '../data/liver_hepg2/tissue29_prot.tsv',
+    #     create_new_genes=True,
+    #     isdebug=isdebug
+    # )
     # exit(0)
-    for i,gene in enumerate(dataloader.genes):
-        all_databases_gene_data = [x[i] for x in databases_data]
-        print('gene {} of {}'.format(i, len(dataloader.genes)))
-        gene_batch_exps = dataloader.gene2sampleExperimentHasId(
-            gene.id_uniprot, 
-            all_databases_gene_data,
-            databases2use,
-            max_measures
-        )
-        debug(len(gene_batch_exps))
-        debug(gene_batch_exps[0].shape)
-        exit(0)
-    max_shape = 0
-    max_shape_orig = (0,0)
-    max_shape_name = ''
+    # # gi_onehot = dataloader.mappingDatabase2oneHot('GI')
+    # # go_onehot = dataloader.mappingDatabase2oneHot('GO')
+    # # pubmed_onehot = dataloader.mappingDatabase2oneHot('PubMed')
+    # # mim_onehot = dataloader.mappingDatabase2oneHot('MIM')
+    # # refseq_onehot = dataloader.mappingDatabase2oneHot('RefSeq')
+    # # ensembl_onehot = dataloader.mappingDatabase2oneHot('Ensembl')
+    # max_measures=dataloader.maxRnaMeasurementsInData()
+    databases = uniq_nonempty_uniprot_mapping_header()
+    # ensg_id = dataloader.uniprot2ensg(dataloader.genes[0].id())
+    # # print(ensg_id)
+    # exit()
+    # for x in databases:
+    #     print(x, dataloader.genes[0].id())
+    #     data = dataloader.uniprot2db(dataloader.genes[0].id(), x)
+    #     print(data)
+    # exit(0)
+    # databases_data = []
+    # databases2use =[]
+    # a1 = [x.protein_copies_per_cell_1D for x in dataloader.genes if is_number(x.protein_copies_per_cell_1D) and x.protein_copies_per_cell_1D > 0]
+    # a2 = [x.protein_copies_per_cell_2D for x in dataloader.genes if is_number(x.protein_copies_per_cell_2D) and x.protein_copies_per_cell_2D > 0]
+    # print('1d')
+    # for a in a1:
+    #     print(a)
+    # print('2d')
+    # for a in a1:
+    #     print(a)
+    # print('good prots 1d', len(a1))
+    # print('good prots 2d', len(a2))
+    # exit(0)
+    # for x in databases:
+    #     mtrx = dataloader.mappingDatabase2matrix(x)
+    #     if not mtrx.shape[1]:
+    #         continue
+    #     databases_data.append(mtrx)
+    #     databases2use.append(x)
+    # # exit(0)
+    # for i,gene in enumerate(dataloader.genes):
+    #     all_databases_gene_data = [x[i] for x in databases_data]
+    #     print('gene {} of {}'.format(i, len(dataloader.genes)))
+    #     gene_batch_exps = dataloader.gene2sampleExperimentHasId(
+    #         gene.id_uniprot, 
+    #         all_databases_gene_data,
+    #         databases2use,
+    #         max_measures
+    #     )
+    #     debug(len(gene_batch_exps))
+    #     debug(gene_batch_exps[0].shape)
+    #     exit(0)
+    # max_shape = 0
+    # max_shape_orig = (0,0)
+    # max_shape_name = ''
     for db_name in databases:
         onehot_m = dataloader.mappingDatabase2matrix(db_name)
         shape_s = onehot_m.flatten().shape[0]
-        if shape_s > max_shape:
-            max_shape = shape_s
-            max_shape_name = db_name
-            max_shape_orig = onehot_m.shape
+        # if shape_s > max_shape:
+        #     max_shape = shape_s
+        #     max_shape_name = db_name
+        #     max_shape_orig = onehot_m.shape
         onehot = dataloader.mappingDatabase2oneHot(db_name)
         alph = dataloader.mappingDatabaseAlphabet(db_name)
         print('=====\nDATABASE::',db_name)
@@ -675,7 +675,7 @@ if __name__ == '__main__':
         if alph_size:
             print('example::')
             print(alph[:5])
-    print('max', max_shape, 'database', max_shape_name, 'matrix', max_shape_orig)
+    # print('max', max_shape, 'database', max_shape_name, 'matrix', max_shape_orig)
     dataloader.sequencesAnalys()
     
         
