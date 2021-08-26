@@ -214,6 +214,7 @@ class DataLoader:
         uniprot_gene_id, 
         databases_gene_data,
         databases2use,
+        max_db_data,
         max_measures=None,
         rna_exps_alphabet=None,
         protein_exps_alphabet=None
@@ -225,8 +226,8 @@ class DataLoader:
         if not protein_exps_alphabet:
             protein_exps_alphabet = self.proteinMeasurementsAlphabet()
         gene, gene_idx = self.gene(uniprot_gene_id)
-        rna_experiments_size = len(gene.rna_measurements)
-        variable_length_layer_size = int(DataLoader.max_db2acids_size())
+        rna_experiments_size = len(rna_exps_alphabet)
+        variable_length_layer_size = max_db_data
         batch = np.zeros(
             (
                 (len(databases2use)+4), 
@@ -289,7 +290,9 @@ class DataLoader:
                     len_filled = databases_gene_data[k].shape[0]
                     gene_experiments_batches[last_filled][id2fill][:len_filled] = databases_gene_data[k]
                 last_filled += 1
-        gene_experiments_batches = [x for x in gene_experiments_batches if x is not None] 
+        gene_experiments_batches = [x for x in gene_experiments_batches if x is not None]
+        if not len(gene_experiments_batches):
+            return None 
         print(
             'created batch {} for gene {}. last_layer_id_filled={}'.format(  
                 np.array(gene_experiments_batches).shape,
@@ -385,10 +388,13 @@ class DataLoader:
             databases = databases[:lim_ifdebug]
         databases_data = []
         databases2use =[]
+        max_db_alph = 0
         for x in databases:
             mtrx, alph = self.mappingDatabase2matrix(x)
             if not mtrx.shape[1]:
                 continue
+            if len(alph) > max_db_alph:
+                max_db_alph = len(alph) 
             databases_data.append(mtrx)
             databases2use.append(x)
         genes_exps_batches = []
@@ -398,16 +404,17 @@ class DataLoader:
                     break
             print('gene {} of {}'.format(j, len(self.genes())))
             all_databases_gene_data = [x[j] for x in databases_data]
-            genes_exps_batches.append(
-                self.gene2sampleExperimentHasId(
-                    gene.id_uniprot, 
-                    all_databases_gene_data,
-                    databases2use,
-                    max_measures,
-                    rna_exps_alphabet,
-                    protein_exps_alphabet
-                )
+            o = self.gene2sampleExperimentHasId(
+                gene.id_uniprot, 
+                all_databases_gene_data,
+                databases2use,
+                max_db_alph,
+                max_measures,
+                rna_exps_alphabet,
+                protein_exps_alphabet
             )
+            if o:
+                genes_exps_batches.append(o)
         data = []
         labels = []
         for gene_id in range(len(genes_exps_batches)):
