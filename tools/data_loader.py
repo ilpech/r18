@@ -50,8 +50,8 @@ from uniprot_api import getGeneFromApi, sequence
 from typing import List
 from gene import Gene, GenesMapping
 
-isdebug = True
-# isdebug = False
+# isdebug = True
+isdebug = False
 
 class DataLoader:
     """
@@ -181,6 +181,24 @@ class DataLoader:
            raise Exception('gene::gene {} not found'.format(upirot_gene_id))
         return self.genes()[gene_ids[0]], gene_ids[0]
     
+    def rnaMeasurementsAlphabet(self):
+        out = []
+        for g in self.genes():
+            for k, v in g.rna_measurements.items():
+                if k not in out:
+                    out.append(k)
+        out = set(out)
+        return sorted(out)
+    
+    def proteinMeasurementsAlphabet(self):
+        out = []
+        for g in self.genes():
+            for k, v in g.protein_measurements.items():
+                if k not in out:
+                    out.append(k)
+        out = set(out)
+        return sorted(out)
+    
     def maxRnaMeasurementsInData(self):
         m = 0
         for g in self.genes():
@@ -194,77 +212,90 @@ class DataLoader:
         uniprot_gene_id, 
         databases_gene_data,
         databases2use,
-        max_measures=None
+        max_measures=None,
+        rna_exps_alphabet=None,
+        protein_exps_alphabet=None
     ):
         if not max_measures:
             max_measures = self.maxRnaMeasurementsInData()
+        if not rna_exps_alphabet:
+            rna_exps_alphabet = self.rnaMeasurementsAlphabet()
+        if not protein_exps_alphabet:
+            protein_exps_alphabet = self.proteinMeasurementsAlphabet()
         gene, gene_idx = self.gene(uniprot_gene_id)
-        experiments_size = len(gene.rna_measurements)
+        rna_experiments_size = len(gene.rna_measurements)
         variable_length_layer_size = int(DataLoader.max_db2acids_size())
         batch = np.zeros(
             (
-                (len(databases2use)+3), 
-                # 3 channels::
+                (len(databases2use)+4), 
+                # 4 channels::
                 #   - channel full of rna expetiment value
                 #   - channel for rna experiment_id(?)
+                #   - channel for prot label experiment_id(?)
                 #   - channel for amino acids sequence coding (...*20)
                 variable_length_layer_size,
                 int(DataLoader.magic_consts.protein_amino_acids_size)
             )
         )
-        gene_experiments_batches = [batch.copy()] * experiments_size
-        experiments_alph = sorted([e for e,_ in gene.rna_measurements.items()])
+        gene_experiments_batches = [None] * (len(rna_exps_alphabet)*len(protein_exps_alphabet))
+        labels2add_prot = ['protein_copies_per_cell_1D', 'protein_copies_per_cell_2D']
         gene_seq_onehot = gene.apiSeqOneHot()
         onehot_rows = gene_seq_onehot.shape[0]
         if onehot_rows > variable_length_layer_size:
            onehot_rows = variable_length_layer_size
         api_seq = gene.apiSequence()
-        # !error rna experiment id is always 17
-        # exit(0)
-        for i in range(experiments_size):
-            exp = experiments_alph[i]
-            value = gene.rna_measurements[exp]
-            norm_value = norm_shifted_log(value)
-            # first channel is fullfilled with rna experiment value
-            gene_experiments_batches[i][0].fill(norm_value)
-            # second channel is fullfilled with rna experiment id
-            id2fill_exp = i
-            gene_experiments_batches[i][1].fill(id2fill_exp)
-            # third channel is filled by gene seq in onehot representation
-            if onehot_rows:
-                gene_experiments_batches[i][2][:onehot_rows] = gene_seq_onehot[:onehot_rows]
-            # !debug
-            # for l,row in enumerate(gene_experiments_batches[i][2]):
-            #     id_ = list2nonEmptyIds(row)
-            #     if not len(id_):
-            #         # empty row detected
-            #         break
-            #     id_ = id_[0]
-            #     debug(Gene.proteinAminoAcidsAlphabet()[id_])
-            #     # print(gene_seq_onehot[l][id_])
-            #     print('from api', api_seq[l])
-            #     print(row)
-            # debug(np.sum(gene_seq_onehot))
-            # debug(np.sum(gene_experiments_batches[i][2]))
-            for j, database in enumerate(databases2use):
-                id2fill = j + 3
-                len_filled = databases_gene_data[j].shape[0]
-                gene_experiments_batches[i][id2fill][:len_filled] = databases_gene_data[j]
+        last_filled = 0
+        for i in range(rna_experiments_size):
+            experiment = rna_exps_alphabet[i]
+            try:
+                value = gene.rna_measurements[experiment]
+            except:
+                continue
+            if 'tissue29_' in experiment:
+                ids2fill_prot_exp = [j for j in range(len(protein_exps_alphabet)) if protein_exps_alphabet[j] == experiment]
+            else:
+                ids2fill_prot_exp = [j for j in range(len(protein_exps_alphabet)) if protein_exps_alphabet[j] in labels2add_prot]
+            for j in range(len(ids2fill_prot_exp)): 
+                norm_value = norm_shifted_log(value)
+                gene_experiments_batches[last_filled] = batch.copy() 
+                # first channel is fullfilled with rna experiment value
+                gene_experiments_batches[last_filled][0].fill(norm_value)
+                # second channel is fullfilled with rna experiment id
+                id2fill_rna_exp = i
+                gene_experiments_batches[last_filled][1].fill(id2fill_rna_exp)
+                # third channel is full filled with prot experiment id
+                id2fill_prot_exp = ids2fill_prot_exp[j]
+                gene_experiments_batches[last_filled][2].fill(id2fill_prot_exp)
+                # 4-nd channel is filled by gene seq in onehot representation
+                if onehot_rows:
+                    gene_experiments_batches[last_filled][3][:onehot_rows] = gene_seq_onehot[:onehot_rows]
+                # !debug
+                # for l,row in enumerate(gene_experiments_batches[i][2]):
+                #     id_ = list2nonEmptyIds(row)
+                #     if not len(id_):
+                #         # empty row detected
+                #         break
+                #     id_ = id_[0]
+                #     debug(Gene.proteinAminoAcidsAlphabet()[id_])
+                #     # print(gene_seq_onehot[l][id_])
+                #     print('from api', api_seq[l])
+                #     print(row)
+                # debug(np.sum(gene_seq_onehot))
+                # debug(np.sum(gene_experiments_batches[i][2]))
+                for k, database in enumerate(databases2use):
+                    id2fill = k + 4
+                    len_filled = databases_gene_data[k].shape[0]
+                    gene_experiments_batches[last_filled][id2fill][:len_filled] = databases_gene_data[k]
+                last_filled += 1
+        gene_experiments_batches = [x for x in gene_experiments_batches if x is not None] 
         print(
-            'created batch {} for gene {}'.format(  
+            'created batch {} for gene {}. last_layer_id_filled={}'.format(  
                 np.array(gene_experiments_batches).shape,
-                gene.id()
+                gene.id(),
+                last_filled
             ) 
         )
-        # !error handling
-        for i in range(len(gene_experiments_batches)):
-            debug(gene.id())
-            debug(i)
-            debug(np.mean(gene_experiments_batches[i][1]))
-            debug(gene_experiments_batches[i][1][:5])
-        #     exit()
-        exit()
-        return gene_experiments_batches            
+        return gene_experiments_batches        
     
     def dataFromMappingDatabase(self, db_name, gene_name):
         '''
@@ -335,8 +366,11 @@ class DataLoader:
         print('max set seq', max_set_seq, len(max_set_seq))
     
     def data(self, isdebug=False):
-        lim_ifdebug = 3
+        db_lim_ifdebug = 3
+        lim_ifdebug = 100
         max_measures = self.maxRnaMeasurementsInData()
+        rna_exps_alphabet = self.rnaMeasurementsAlphabet()
+        protein_exps_alphabet = self.proteinMeasurementsAlphabet()
         gene_exp_data2train = []
         databases = uniq_nonempty_uniprot_mapping_header()
         if isdebug:
@@ -361,44 +395,30 @@ class DataLoader:
                     gene.id_uniprot, 
                     all_databases_gene_data,
                     databases2use,
-                    max_measures
+                    max_measures,
+                    rna_exps_alphabet,
+                    protein_exps_alphabet
                 )
             )
-        experiments_alph = sorted([e for e,_ in gene.rna_measurements.items()])
-        
         data = []
         labels = []
-        labels2add_prot = ['protein_copies_per_cell_1D', 'protein_copies_per_cell_2D']
         for gene_id in range(len(genes_exps_batches)):
             gene = self.genes()[gene_id] # проверить точно ли правильная индексация?
             for exp_id in range(len(genes_exps_batches[gene_id])):
-                experiment = experiments_alph[exp_id]
-                if 'tissue29' in experiment:
-                    try:
-                        if not is_number(gene.protein_measurements[experiment]):
-                            continue
-                        data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
-                        labels.append(norm_shifted_log(gene.protein_measurements[experiment].astype('float32')))
-                        print('tissue29 prot {} added {}'.format(
-                            experiment, 
-                            norm_shifted_log(gene.protein_measurements[experiment].astype('float32'))
-                        ))
-                    except:
-                        pass
-                else:
-                    for l in labels2add_prot:
-                        try:
-                            if not is_number(gene.protein_measurements[l]):
-                                continue
-                            data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
-                            labels.append(norm_shifted_log(gene.protein_measurements[l].astype('float32')))
-                            print('non tissue29 prot {} added {}'.format(l, norm_shifted_log(gene.protein_measurements[l].astype('float32'))))
-                        except:
-                            pass
-                        
+                rna_exp_id = int(np.mean(genes_exps_batches[gene_id][exp_id][1]))
+                prot_exp_id = int(np.mean(genes_exps_batches[gene_id][exp_id][2]))
+                rna_experiment = rna_exps_alphabet[rna_exp_id]
+                prot_experiment = protein_exps_alphabet[prot_exp_id]
+                try:
+                    exp_v = float(gene.protein_measurements[prot_experiment]) 
+                    # if not is_number(gene.protein_measurements[experiment]):
+                        # continue
+                    data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
+                    labels.append(norm_shifted_log(exp_v))
+                except:
+                    pass
         labels, shuffle_indxs = shuffle(labels)
         data = setindxs(data, shuffle_indxs)
-        exit(0)
         # !error handling
         # for d in data:
         #     debug(d.shape)
@@ -535,7 +555,7 @@ class DataLoader:
         tissues = rna_tissues
         good_data = 0
         for i in range(len(prot_ensg_ids)):
-            if isdebug and good_data > 10:
+            if isdebug and good_data > 500:
                 break
             ensg_id = prot_ensg_ids[i]
             uniprot_id = [x.uniprot_id for k, x in ensg2uniprot.items() if x.ensg_id == ensg_id]
@@ -634,6 +654,7 @@ if __name__ == '__main__':
             databases2use,
             max_measures
         )
+        debug(len(gene_batch_exps))
         debug(gene_batch_exps[0].shape)
         exit(0)
     max_shape = 0

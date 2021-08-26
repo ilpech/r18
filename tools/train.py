@@ -28,8 +28,8 @@ from gene_mapping import (
     uniq_nonempty_uniprot_mapping_header
 )
 
-isdebug = True
-# isdebug = False
+# isdebug = True
+isdebug = False
 
 class RegressionResNet(HybridBlock):
     def __init__(self, block, layers, channels, drop_rate, **kwargs):
@@ -97,12 +97,12 @@ class ProteinAbundanceTrainer:
         with open(config_path) as f:
             self.config = yaml.load(f)
         self.data_loader = DataLoader(config_path)
-        # self.data_loader.loadTissue29data2genes(
-        #     '../data/liver_hepg2/tissue29_rna.tsv',
-        #     '../data/liver_hepg2/tissue29_prot.tsv',
-        #     create_new_genes=True,
-        #     isdebug=isdebug
-        # )
+        self.data_loader.loadTissue29data2genes(
+            '../data/liver_hepg2/tissue29_rna.tsv',
+            '../data/liver_hepg2/tissue29_prot.tsv',
+            create_new_genes=True,
+            isdebug=isdebug
+        )
         try:
             self.ctx = [mx.gpu()]
             a = mx.nd.array([[0]], ctx=self.ctx[0])
@@ -120,7 +120,7 @@ class ProteinAbundanceTrainer:
         self.wd = self.train_settings['wd']
         self.momentum = self.train_settings['momentum']
         self.optimizer = self.train_settings['optimizer']
-        self.net_name = 'resnetregr.004'
+        self.net_name = self.train_settings['net_name']
         self.params_path = '../trained/{}'.format(self.net_name)
         drop_rate = 0.0
         num_layers=22
