@@ -37,16 +37,21 @@ from tools import (
     listfind,
     is_number,
     setindxs,
-    shuffle
+    shuffle,
+    RnaProtAbundance
 )
 from gene_mapping import (
     mapping2dict, 
     uniprot_mapping_header, 
-    uniq_nonempty_uniprot_mapping_header
+    uniq_nonempty_uniprot_mapping_header,
+    rewrite_mapping_with_ids
 )
 from uniprot_api import getGeneFromApi, sequence
 from typing import List
-from gene import Gene
+from gene import Gene, GenesMapping
+
+isdebug = True
+# isdebug = False
 
 class DataLoader:
     """
@@ -137,6 +142,16 @@ class DataLoader:
         )
         print('reading mapping', self.gene_mapping_path)
         self.mapping = mapping2dict(self.gene_mapping_path)
+        engs2uniprot_file = '../data/mapping_out/engs2uniprot.txt'
+        full_genome_mappping_path = '../data/liver_hepg2/HUMAN_9606_idmapping_selected.tab'
+        print('reading ensg2uniprot_mapping')
+        if not os.path.isfile(engs2uniprot_file):
+            self.ensg2uniprot_mapping: GenesMapping = DataLoader.ensg2uniprot(
+                full_genome_mappping_path,
+                engs2uniprot_file 
+            )
+        else:
+            self.ensg2uniprot_mapping = GenesMapping(engs2uniprot_file)
         self.gene_ids = [x for x in self.rna_data['Uniprot AC'] if isinstance(x, str)]
         self.__genes: List[Gene] = []
         print('creating genes')
@@ -242,11 +257,13 @@ class DataLoader:
             ) 
         )
         # !error handling
-        # for i in range(len(gene_experiments_batches)):
-            # debug(i)
-            # debug(np.mean(gene_experiments_batches[i][1]))
-            # exit()
-        # exit()
+        for i in range(len(gene_experiments_batches)):
+            debug(gene.id())
+            debug(i)
+            debug(np.mean(gene_experiments_batches[i][1]))
+            debug(gene_experiments_batches[i][1][:5])
+        #     exit()
+        exit()
         return gene_experiments_batches            
     
     def dataFromMappingDatabase(self, db_name, gene_name):
@@ -347,20 +364,41 @@ class DataLoader:
                     max_measures
                 )
             )
+        experiments_alph = sorted([e for e,_ in gene.rna_measurements.items()])
+        
         data = []
         labels = []
+        labels2add_prot = ['protein_copies_per_cell_1D', 'protein_copies_per_cell_2D']
         for gene_id in range(len(genes_exps_batches)):
             gene = self.genes()[gene_id] # проверить точно ли правильная индексация?
             for exp_id in range(len(genes_exps_batches[gene_id])):
-                try:
-                    if not is_number(gene.protein_copies_per_cell_1D):
-                        continue
-                    data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
-                    labels.append(norm_shifted_log(gene.protein_copies_per_cell_1D))
-                except:
-                    pass
+                experiment = experiments_alph[exp_id]
+                if 'tissue29' in experiment:
+                    try:
+                        if not is_number(gene.protein_measurements[experiment]):
+                            continue
+                        data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
+                        labels.append(norm_shifted_log(gene.protein_measurements[experiment].astype('float32')))
+                        print('tissue29 prot {} added {}'.format(
+                            experiment, 
+                            norm_shifted_log(gene.protein_measurements[experiment].astype('float32'))
+                        ))
+                    except:
+                        pass
+                else:
+                    for l in labels2add_prot:
+                        try:
+                            if not is_number(gene.protein_measurements[l]):
+                                continue
+                            data.append(genes_exps_batches[gene_id][exp_id].astype('float32'))
+                            labels.append(norm_shifted_log(gene.protein_measurements[l].astype('float32')))
+                            print('non tissue29 prot {} added {}'.format(l, norm_shifted_log(gene.protein_measurements[l].astype('float32'))))
+                        except:
+                            pass
+                        
         labels, shuffle_indxs = shuffle(labels)
         data = setindxs(data, shuffle_indxs)
+        exit(0)
         # !error handling
         # for d in data:
         #     debug(d.shape)
@@ -389,7 +427,29 @@ class DataLoader:
             print(self.mapping[gene.id()]['GO'])
             print('Ensembl keywords::')
             print(self.mapping[gene.id()]['Ensembl'])
-            
+    
+    @staticmethod 
+    def ensg2uniprot(
+        mapping_path='../data/liver_hepg2/HUMAN_9606_idmapping_selected.tab',
+        out_path='../data/mapping_out/engs2uniprot.txt'
+    ):
+        print('ensg2uniprot::reading {}'.format(mapping_path))
+        mapping = mapping2dict(mapping_path)
+        mapping_size = len(mapping)
+        ensg_db = 'Ensembl'
+        uniprot_db = 'UniProtKB-ID'
+        out = GenesMapping()
+        i = 0
+        for gene_name, value in mapping.items():
+            if not i % 5000:
+                print('{} of {}'.format(i, mapping_size))
+            if len(value[ensg_db]):
+                out.add(gene_name, value[ensg_db][0])
+            i += 1
+        if len(out_path):
+            out.write(out_path)
+        return out
+    
     def uniprot2ensg(self, uniprot_gene_id):
         return self.dataFromMappingDatabase('Ensembl', uniprot_gene_id)
     
@@ -405,37 +465,130 @@ class DataLoader:
     def loadTissue29data2genes(
         self, 
         rna_path, 
-        prot_path
+        prot_path,
+        create_new_genes=True,
+        isdebug=False
     ):
+        
+        class Tissue29Data:
+            def __init__(
+                self,
+                uniprot_id,
+                ensg_id,
+                experiments = {}
+            ):
+                self.uniprot_id = uniprot_id
+                self.ensg_id = ensg_id
+                self.experiments = experiments
+        print(
+            'loading tissue29 data...\ngenes now {}\ncreate_new_genes={}'.format(       
+                len(self.genes()), 
+                create_new_genes
+            ) 
+        )
         import csv
-        header = []
+        rna_tissues = []
+        prot_tissues = []
+        rna_header = []
+        prot_header = []
         rna_data = []
-        tissues = []
-        gene_ensg_ids = []
-        id_col_name = None
+        rna_ensg_ids = []
+        rna_id_col_name = None
+        prot_data = []
+        prot_ensg_ids = []
+        prot_id_col_name = None
+        ensg2uniprot = self.ensg2uniprot_mapping.mapping()
         with open(rna_path) as f:
             reader = csv.DictReader(f, delimiter='\t')
-            if not len(header):
+            if not len(rna_header):
                 for rs in reader:
                     for r in rs:
-                        header.append(r)
+                        rna_header.append(r)
                     break
-                id_col_name = header[0]
-                tissues = header[1:]
+                rna_id_col_name = rna_header[0]
+                rna_tissues = rna_header[1:]
             for ord_dict in reader:
-                gene_ensg_ids.append(ord_dict[id_col_name]) 
-                for t in tissues:
-                    rna_data.append(ord_dict[t])
-        for id_ in gene_ensg_ids:
-            print(id_)
-        print(len(gene_ensg_ids))
-        print('loadTissue29data2genes:: exit OK')
-        exit()
+                rna_ensg_ids.append(ord_dict[rna_id_col_name]) 
+                rna_data.append(ord_dict)
+        print('rna data loaded {} from file {}'.format(
+            len(rna_ensg_ids),
+            rna_path
+        ))
+        with open(prot_path) as f:
+            reader = csv.DictReader(f, delimiter='\t')
+            if not len(prot_header):
+                for rs in reader:
+                    for r in rs:
+                        prot_header.append(r)
+                    break
+                prot_id_col_name = prot_header[0]
+                prot_tissues = prot_header[1:]
+            for ord_dict in reader:
+                prot_ensg_ids.append(ord_dict[prot_id_col_name]) 
+                prot_data.append(ord_dict)
+        print('prot data loaded {} from file {}'.format(
+            len(prot_ensg_ids),
+            prot_path
+        ))
+        if rna_tissues != prot_tissues:
+            raise Exception('rna_tissues != prot_tissues')
+        tissues = rna_tissues
+        good_data = 0
+        for i in range(len(prot_ensg_ids)):
+            if isdebug and good_data > 10:
+                break
+            ensg_id = prot_ensg_ids[i]
+            uniprot_id = [x.uniprot_id for k, x in ensg2uniprot.items() if x.ensg_id == ensg_id]
+            if not len(uniprot_id):
+                print('error while searching ', ensg_id)
+                continue
+            uniprot_id = uniprot_id[0]
+            is_new_gene = False
+            gene = [i for i in range(len(self.genes())) if self.genes()[i].id() == uniprot_id]
+            if not len(gene):
+                if not create_new_genes:
+                    continue
+                gene = Gene(uniprot_id, True)
+                is_new_gene = True
+            else:
+                gene = self.genes()[gene[0]]
+                print('tissue29 data would be addect to currently existing gene {}'.format(gene.id()))
+            gene.id_ensg = ensg_id
+            is_any_found = 0
+            for t in range(len(tissues)):
+                tissue = tissues[t]
+                prot_value = float(prot_data[i][tissue])
+                rna_value = float(rna_data[i][tissue])
+                if prot_value == 0:
+                    continue
+                if rna_value == 0:
+                    continue
+                is_any_found += 1
+                good_data += 1
+                measurement_name = 'tissue29_{}'.format(tissue)
+                gene.rna_measurements[measurement_name] = rna_value
+                gene.protein_measurements[measurement_name] = prot_value
+            if not is_any_found:
+                continue
+            if is_new_gene:
+                self.genes().append(gene)
+        
+        print('{} good genes experiments added'.format(good_data))
+        print('{} genes now'.format(len(self.genes())))
 
 if __name__ == '__main__':
+    # DataLoader.ensg2uniprot(
+    #     '../data/liver_hepg2/HUMAN_9606_idmapping_selected.tab'
+    # )
+    # exit()
     dataloader = DataLoader('../config/train.yaml')
-    dataloader.loadTissue29data2genes('../data/liver_hepg2/tissue29_rna.tsv',
-                                      '../data/liver_hepg2/tissue29_prot.tsv')
+    dataloader.loadTissue29data2genes(
+        '../data/liver_hepg2/tissue29_rna.tsv',
+        '../data/liver_hepg2/tissue29_prot.tsv',
+        create_new_genes=True,
+        isdebug=isdebug
+    )
+    exit(0)
     # gi_onehot = dataloader.mappingDatabase2oneHot('GI')
     # go_onehot = dataloader.mappingDatabase2oneHot('GO')
     # pubmed_onehot = dataloader.mappingDatabase2oneHot('PubMed')
@@ -445,7 +598,7 @@ if __name__ == '__main__':
     max_measures=dataloader.maxRnaMeasurementsInData()
     databases = uniq_nonempty_uniprot_mapping_header()
     ensg_id = dataloader.uniprot2ensg(dataloader.genes[0].id())
-    print(ensg_id)
+    # print(ensg_id)
     exit()
     for x in databases:
         print(x, dataloader.genes[0].id())

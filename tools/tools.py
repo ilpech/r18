@@ -11,6 +11,11 @@ from mxnet.gluon.loss import Loss, _apply_weighting, _reshape_like
 import numpy as np
 from varname.helpers import debug
 
+class RnaProtAbundance:
+    def __init__(self, rna_measurement, prot_measurement):
+        self.rna_measurement = rna_measurement
+        self.prot_measurement = prot_measurement
+
 def listfind(set_, subset_):
     '''
     returns found (ids_of_subset_found_objects_in_set, found_values)

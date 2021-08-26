@@ -97,6 +97,12 @@ class ProteinAbundanceTrainer:
         with open(config_path) as f:
             self.config = yaml.load(f)
         self.data_loader = DataLoader(config_path)
+        # self.data_loader.loadTissue29data2genes(
+        #     '../data/liver_hepg2/tissue29_rna.tsv',
+        #     '../data/liver_hepg2/tissue29_prot.tsv',
+        #     create_new_genes=True,
+        #     isdebug=isdebug
+        # )
         try:
             self.ctx = [mx.gpu()]
             a = mx.nd.array([[0]], ctx=self.ctx[0])
@@ -123,14 +129,13 @@ class ProteinAbundanceTrainer:
             num_layers=16
             width_factor=1
         assert (num_layers - 4) % 6 == 0
-        # n = (num_layers - 4) // 6
-        # layers = [n] * 3
-        # channels = [16, 16*width_factor, 32*width_factor, 64*width_factor]
+        print('creating resnset regression model...')
         self.model = RegressionResNet.get_regression_wide_resnet(
             num_layers, 
             width_factor, 
             drop_rate=0.0
         )
+        print('created. layers={} wf={}'.format(num_layers, width_factor))
 
     def save_checkpoint(self, params_path, epoch):
         cwd = os.getcwd()

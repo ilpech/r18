@@ -3,8 +3,8 @@ import gzip
 
 def uniq_nonempty_uniprot_mapping_header():
     return [
-        'GO',
         'UniProtKB-ID',
+        'GO',
         'GeneID (EntrezGene)',
         'RefSeq',
         'GI',

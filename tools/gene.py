@@ -4,6 +4,45 @@ from typing import List
 from tools import readSearchXlsxReport
 from uniprot_api import getGeneFromApi, sequence
 
+class GenesMapping:
+    def __init__(self, readpath=''):
+        self.__mapping = {}
+        if len(readpath):
+            self.read(readpath)
+        
+    def mapping(self):
+        return self.__mapping
+    
+    def add(self, uniprot_id, ensg_id):
+        self.mapping()[uniprot_id] = self.GeneMapping(uniprot_id, ensg_id)
+    
+    def write(self, outpath):
+        if not os.path.isdir(os.path.split(outpath)[0]):
+            os.makedirs(os.path.split(outpath)[0])
+        with open(outpath, 'w') as f:
+            for k,v in self.mapping().items():
+                f.write('{} {}\n'.format(k,v.ensg_id))
+        print('{} genes mapping written to {}'.format(len(self.mapping()), outpath))
+        
+    def read(self, inpath):
+        with open(inpath, 'r') as f:
+            data = f.readlines()
+            print('{} mapping lines read from {}'.format(len(data), inpath))
+            for d in data:
+                d = d.replace('\n', '')
+                splt = d.split(' ')
+                self.mapping()[splt[0]] = self.GeneMapping(splt[0], splt[1])
+
+    class GeneMapping:
+        def __init__(
+            self,
+            uniprot_id,
+            ensg_id
+        ):
+            self.ensg_id = ensg_id 
+            self.uniprot_id = uniprot_id
+    
+
 class Gene:
     def __init__(
         self,
@@ -12,7 +51,6 @@ class Gene:
     ):
         self.id_uniprot: str = uniprot_id
         # print('created gene: ', self.id_uniprot)
-        self.ids = [] # other gene IDs key - name of database, e.g. uniprot, value - list of str ids
         # init by addProteinAbundanceReport
         self.ratio: float  = None #Ratio (Spep/Slab)
         self.c_fmol_mkg: float = None 
@@ -26,7 +64,7 @@ class Gene:
         # init by ion data
         self.compound: str = None
         # add other info from file
-        #init by rna
+        # init by rna
         self.gene_name = None
         self.protein_name = None
         self.chromosome: int = None # number
@@ -34,6 +72,9 @@ class Gene:
         self.nextprot_status = None
         self.peptide_seq = None
         self.only_w_values = only_w_values
+        self.id_ensg = None
+        
+        self.mapping : GeneMapping = None
         
     def id(self):
         return self.id_uniprot
