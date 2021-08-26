@@ -65,7 +65,7 @@ class DataLoader:
         #     # DATABASE:: Additional PubMed
         #     # db alph size 12180
         #     # db aplh size converted to amino acids:: 609.0*20
-        max_database_alph_size = 12180
+        max_database_alph_size = 32402
         protein_amino_acids_size = 20
 
     @staticmethod
