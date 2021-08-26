@@ -559,7 +559,7 @@ class DataLoader:
             ensg_id = prot_ensg_ids[i]
             uniprot_id = [x.uniprot_id for k, x in ensg2uniprot.items() if x.ensg_id == ensg_id]
             if not len(uniprot_id):
-                print('error while searching ', ensg_id)
+                print('error while searching ensg {} in uniprot'.format(ensg_id))
                 continue
             uniprot_id = uniprot_id[0]
             is_new_gene = False

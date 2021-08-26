@@ -28,8 +28,34 @@ from gene_mapping import (
     uniq_nonempty_uniprot_mapping_header
 )
 
-# isdebug = True
-isdebug = False
+isdebug = True
+# isdebug = False
+
+class TrainLogger:
+    def __init__(
+        self, 
+        outpath
+    ):
+        self.out = outpath
+        if os.path.isfile(self.out):
+            with open(self.out, 'w') as f:
+                pass
+        else:
+            if not os.path.isdir(os.path.split(self.out)[0]):
+                os.makedirs(os.path.split(self.out)[0])
+            with open(self.out, 'w') as f:
+                pass
+        print('log file is opened at', self.out)
+    
+    def write(self, m):
+        with open(self.out, 'a') as f:
+            f.write(m)
+    
+    def print(self, m, show=True, write=True):
+        if show:
+            print(m)
+        if write:
+            self.write(m+'\n')
 
 class RegressionResNet(HybridBlock):
     def __init__(self, block, layers, channels, drop_rate, **kwargs):
@@ -96,21 +122,25 @@ class ProteinAbundanceTrainer:
     def __init__(self, config_path):
         with open(config_path) as f:
             self.config = yaml.load(f)
+        self.train_settings = self.config['train']
+        self.net_name = self.train_settings['net_name']
+        self.params_path = '../trained/{}'.format(self.net_name)
+        self.log_path = '{}/{}_log.txt'.format(self.params_path, self.net_name)
+        self.logger = TrainLogger(self.log_path)
         self.data_loader = DataLoader(config_path)
         self.data_loader.loadTissue29data2genes(
-            '../data/liver_hepg2/tissue29_rna.tsv',
-            '../data/liver_hepg2/tissue29_prot.tsv',
+            '../data/liver_hepg2/tissue29.5k_rna.tsv',
+            '../data/liver_hepg2/tissue29.5k_prot.tsv',
             create_new_genes=True,
             isdebug=isdebug
         )
         try:
             self.ctx = [mx.gpu()]
             a = mx.nd.array([[0]], ctx=self.ctx[0])
-            print('successfully created gpu array -> using gpu')
+            self.logger.print('successfully created gpu array -> using gpu')
         except:
             self.ctx = [mx.cpu()]
-            print('cannot create gpu array -> using cpu')
-        self.train_settings = self.config['train']
+            self.logger.print('cannot create gpu array -> using cpu')
         self.lr_settings = self.train_settings['lr']
         self.batch_settings = self.train_settings['batch_size']
         self.augm_settings = self.train_settings['augm']
@@ -120,8 +150,6 @@ class ProteinAbundanceTrainer:
         self.wd = self.train_settings['wd']
         self.momentum = self.train_settings['momentum']
         self.optimizer = self.train_settings['optimizer']
-        self.net_name = self.train_settings['net_name']
-        self.params_path = '../trained/{}'.format(self.net_name)
         drop_rate = 0.0
         num_layers=22
         width_factor=2
@@ -129,13 +157,13 @@ class ProteinAbundanceTrainer:
             num_layers=16
             width_factor=1
         assert (num_layers - 4) % 6 == 0
-        print('creating resnset regression model...')
+        self.logger.print('creating resnset regression model...')
         self.model = RegressionResNet.get_regression_wide_resnet(
             num_layers, 
             width_factor, 
             drop_rate=0.0
         )
-        print('created. layers={} wf={}'.format(num_layers, width_factor))
+        self.logger.print('created. layers={} wf={}'.format(num_layers, width_factor))
 
     def save_checkpoint(self, params_path, epoch):
         cwd = os.getcwd()
@@ -156,7 +184,7 @@ class ProteinAbundanceTrainer:
         self.model.export(self.net_name, epoch=epoch)
         self.weights_path = '{}-{:04d}.params'.format(self.net_name, epoch)
         self.sym_path = '{}-symbol.json'.format(self.net_name)
-        print('Network was successfully exported at', exp_dir)
+        self.logger.print('Network was successfully exported at', exp_dir)
         os.chdir(cwd)
 
     def load_exported(self, sym_path='', params_path=''):
@@ -165,21 +193,21 @@ class ProteinAbundanceTrainer:
         self.sym_path and self.params_path are using if given are not exist
         """
         if not os.path.isfile(params_path):
-            print(self.weights_path)
+            self.logger.print(self.weights_path)
             def_w_p = os.path.join(self.params_path, self.weights_path)
             if os.path.isfile(os.path.join(self.params_path, self.weights_path)):
                 params_path = os.path.join(self.params_path, self.weights_path)
-                print('params path from config used')
+                self.logger.print('params path from config used')
             else:
-                print('Check params path', params_path)
+                self.logger.print('Check params path', params_path)
                 raise FileNotFoundError(params_path)
         if not os.path.isfile(sym_path):
-            print('Check sym path', sym_path)
+            self.logger.print('Check sym path', sym_path)
             if os.path.isfile(os.path.join(self.params_path, self.sym_path)):
                 sym_path = os.path.join(self.params_path, self.sym_path)
-                print('sym path from config used')
+                self.logger.print('sym path from config used')
             else:
-                print('Check sym path', sym_path)
+                self.logger.print('Check sym path', sym_path)
                 raise FileNotFoundError(sym_path)
         import warnings
         with warnings.catch_warnings():
@@ -270,6 +298,7 @@ class ProteinAbundanceTrainer:
         val_metric = mx.metric.MSE()
         best_epoch = 0
         min_val_error = None
+        first_forward = True
         for i in range(1, self.epochs):
             tic = time.time()
             train_metric.reset()
@@ -278,6 +307,9 @@ class ProteinAbundanceTrainer:
             passed = 0
             while passed < data_cnt:
                 for data, labels in train_loader:
+                    if first_forward:
+                        self.logger.print('batch shape::{}'.format(data.shape))
+                        first_forward = False
                     ctx_data = data.as_in_context(self.ctx[0]).astype('float32')
                     with mx.autograd.record():
                         out = self.model(ctx_data)
@@ -316,14 +348,14 @@ class ProteinAbundanceTrainer:
                   train_acc,
                   train_loss
             )
-            print(msg)
+            self.logger.print(msg)
             if not i % 10 or (i > 30 and new_best_val):
                 if new_best_val:
-                    print('new best val')
+                    self.logger.print('new best val')
                 if not isdebug:
                     self.export_nn(i, '../trained')
             if min_val_error and not new_best_val:
-                print('best val was at epoch({})::{:.8f}'.format(best_epoch, min_val_error))
+                self.logger.print('best val was at epoch({})::{:.8f}'.format(best_epoch, min_val_error))
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
