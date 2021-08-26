@@ -50,8 +50,11 @@ class TrainLogger:
         print('log file is opened at', self.out)
     
     def write(self, m):
-        with open(self.out, 'a') as f:
-            f.write(m)
+        try:
+            with open(self.out, 'a') as f:
+                f.write(m)
+        except:
+            pass
     
     def print(self, m, show=True, write=True):
         if show:
