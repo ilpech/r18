@@ -30,8 +30,8 @@ from gene_mapping import (
     uniq_nonempty_uniprot_mapping_header
 )
 
-isdebug = True
-# isdebug = False
+# isdebug = True
+isdebug = False
 
 class TrainLogger:
     def __init__(
@@ -131,8 +131,8 @@ class ProteinAbundanceTrainer:
         self.logger = TrainLogger(self.log_path)
         self.data_loader = DataLoader(config_path)
         self.data_loader.loadTissue29data2genes(
-            '../data/liver_hepg2/tissue29.1k_rna.tsv',
-            '../data/liver_hepg2/tissue29.1k_prot.tsv',
+            '../data/liver_hepg2/tissue29.05k_rna.tsv',
+            '../data/liver_hepg2/tissue29.05k_prot.tsv',
             create_new_genes=True,
             isdebug=isdebug
         )
