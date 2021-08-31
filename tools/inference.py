@@ -89,7 +89,7 @@ inference_shape = config['inference_shape']
 max_label = float(config['denorm_max_label'])
 prot_alph = config['protein_exps_alphabet']
 databases_alph = config['databases']
-writer_path = '{}/r18_tissue29_preds.csv'.format(params_path)
+writer_path = '{}/r18_tissue29_preds.tsv'.format(params_path)
 alph_to_write = ['geneId_uniprot', 'geneId_Ensembl'] + prot_alph
 databases_data = []
 for x in databases_alph:
@@ -98,7 +98,7 @@ for x in databases_alph:
         continue
     databases_data.append(mtrx)
 print('writing to', writer_path)
-with open(writer_path, 'w') as f:
+with open(writer_path, 'w', newline='') as f:
     writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     writer.writerow(alph_to_write)
     genes_size = len(data_loader.genes())
@@ -116,8 +116,17 @@ with open(writer_path, 'w') as f:
             prot_alph 
         )
         # print('GENE::', uid)
-        measurements = [uid, data_loader.uniprot2ensg(uid)]
-        for b in sample:
+        ens = data_loader.uniprot2ensg(uid)
+        if not len(ens):
+            ens = ''
+        else:
+            ens = ens[0]
+        def_v = [-1] * len(rna_alph)
+        measurements = [uid, ens] + def_v
+        for k in range(len(rna_alph)):
+            if k >= len(sample):
+                continue
+            b = sample[k]
             # print('++++++++++')
             batch2inf = mx.nd.array(b, ctx=ctx)
             batch2inf = batch2inf.expand_dims(axis=0)
@@ -129,7 +138,7 @@ with open(writer_path, 'w') as f:
             prot_value = gene.protein_measurements[prot_expt]
             out = net(batch2inf)
             out_norm = denorm_shifted_log(out[0].asscalar()*max_label)
-            measurements.append(out_norm)
+            measurements[prot_expt_id+2] = out_norm
             # debug(rna_expt)
             # debug(rna_value)
             # debug(prot_expt)

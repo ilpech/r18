@@ -235,7 +235,8 @@ class DataLoader:
             )
         )
         gene_experiments_batches = [None] * (len(rna_exps_alphabet)*len(protein_exps_alphabet))
-        labels2add_prot = ['protein_copies_per_cell_1D', 'protein_copies_per_cell_2D']
+        # labels2add_prot = ['protein_copies_per_cell_1D', 'protein_copies_per_cell_2D']
+        labels2add_prot = []
         gene_seq_onehot = gene.apiSeqOneHot()
         onehot_rows = gene_seq_onehot.shape[0]
         if onehot_rows > variable_length_layer_size:
