@@ -61,19 +61,14 @@ class DataLoader:
         '''
         just previously counted values for default setup
         '''
-        # def __init__(self):
-        #     # DATABASE:: Additional PubMed
-        #     # db alph size 12180
-        #     # db aplh size converted to amino acids:: 609.0*20
-        max_database_alph_size = 32402
         protein_amino_acids_size = 20
 
-    @staticmethod
-    def max_db2acids_size():
-        return roundUp(
-            DataLoader.magic_consts.max_database_alph_size/ \
-            DataLoader.magic_consts.protein_amino_acids_size
-        )
+    # @staticmethod
+    # def max_db2acids_size():
+    #     return roundUp(
+    #         DataLoader.magic_consts.max_database_alph_size/ \
+    #         DataLoader.magic_consts.protein_amino_acids_size
+    #     )
         
     
     def _get_argparse(self):

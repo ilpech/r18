@@ -31,8 +31,8 @@ from gene_mapping import (
     uniq_nonempty_uniprot_mapping_header
 )
 
-isdebug = True
-# isdebug = False
+# isdebug = True
+isdebug = False
 
 class TrainLogger:
     def __init__(
@@ -252,7 +252,7 @@ class ProteinAbundanceTrainer:
         databases = uniq_nonempty_uniprot_mapping_header()
         data, labels = self.data_loader.data(isdebug)
         data_cnt = len(labels)
-        data2val_cnt = roundUp(data_cnt/5)
+        data2val_cnt = roundUp(data_cnt/3)
         max_label = mx.nd.array(labels).max().asscalar()
         norm_labels = [float(x/max_label) for x in labels]
         data2train = mx.gluon.data.dataset.ArrayDataset(data[data2val_cnt:], norm_labels[data2val_cnt:])
