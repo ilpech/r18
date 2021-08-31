@@ -260,6 +260,7 @@ class ProteinAbundanceTrainer:
         debug(data_cnt)
         debug(len(data2train))
         debug(len(data2val))
+        debug(max_label)
         train_loader = mx.gluon.data.DataLoader(data2train, batch_size=batch_size, shuffle=True)
         val_loader = mx.gluon.data.DataLoader(data2val, batch_size=batch_size, shuffle=False)
         L = mx.gluon.loss.L2Loss()
@@ -271,6 +272,8 @@ class ProteinAbundanceTrainer:
         best_epoch = 0
         min_val_error = None
         first_forward = True
+        # for k,v in self.data_loader.databases_aplhs.items():
+            # print(k,v)
         for i in range(1, self.epochs):
             # labels, shuffle_indxs = shuffle(labels)
             # data = setindxs(data, shuffle_indxs)
@@ -298,15 +301,15 @@ class ProteinAbundanceTrainer:
                     trainer.step(len(data))
                     train_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
                     train_metric.update(labels, out)
-                    denorm_labels = mx.nd.array([denorm_shifted_log(x.asscalar()) for x in labels])
-                    denorm_out = mx.nd.array([denorm_shifted_log(x.asscalar()) for x in out])
+                    denorm_labels = mx.nd.array([denorm_shifted_log(x.asscalar()*max_label) for x in labels])
+                    denorm_out = mx.nd.array([denorm_shifted_log(x.asscalar()*max_label) for x in out])
                     train_denorm_metric.update(denorm_labels, denorm_out)
             for data, labels in val_loader:
                 ctx_data = data.as_in_context(self.ctx[0]).astype('float32')
                 out = self.model(ctx_data)
                 val_metric.update(labels, out)
-                denorm_labels = mx.nd.array([denorm_shifted_log(x.asscalar()) for x in labels])
-                denorm_out = mx.nd.array([denorm_shifted_log(x.asscalar()) for x in out])
+                denorm_labels = mx.nd.array([denorm_shifted_log(x.asscalar()*max_label) for x in labels])
+                denorm_out = mx.nd.array([denorm_shifted_log(x.asscalar()*max_label) for x in out])
                 val_denorm_metric.update(denorm_labels, denorm_out)
             _, train_denorm_acc = train_denorm_metric.get()
             _, val_denorm_acc = val_denorm_metric.get()

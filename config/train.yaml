@@ -6,7 +6,7 @@ data:
   ionData: ../data/liver_hepg2/prot_ion_data.xlsx
   skipMissing: False
 train:
-  net_name: resnet_regressor.006
+  net_name: resnet_regressor.007
   epochs: 900
   log_interval: 2
   wd: 0.0001

@@ -127,6 +127,7 @@ class DataLoader:
             self.ion_path = opt['ionData']
             self.gene_mapping_path = opt['geneMapping']
         self.genes_mapping_databases = uniprot_mapping_header()
+        self.databases_aplhs = {}
         print('reading rna ', self.rna_path)
         self.rna_data = readSearchXlsxReport(
             self.rna_path,
@@ -391,6 +392,7 @@ class DataLoader:
         max_db_alph = 0
         for x in databases:
             mtrx, alph = self.mappingDatabase2matrix(x)
+            self.databases_aplhs[x] = alph
             if not mtrx.shape[1]:
                 continue
             l_alph = roundUp(len(alph)/20)
