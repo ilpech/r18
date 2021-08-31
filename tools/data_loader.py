@@ -408,7 +408,7 @@ class DataLoader:
                 rna_exps_alphabet,
                 protein_exps_alphabet
             )
-            if isinstance(o, np.array):
+            if o is not None:
                 genes_exps_batches.append(o)
         data = []
         labels = []
