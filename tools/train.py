@@ -6,6 +6,7 @@ from data_loader import DataLoader
 import argparse
 from tools import str2bool
 import yaml
+import json
 import time
 from cifar_wide_resnet import WideResNet, WideResNetBlock
 from mxnet.gluon.block import HybridBlock
@@ -30,8 +31,8 @@ from gene_mapping import (
     uniq_nonempty_uniprot_mapping_header
 )
 
-# isdebug = True
-isdebug = False
+isdebug = True
+# isdebug = False
 
 class TrainLogger:
     def __init__(
@@ -131,6 +132,8 @@ class ProteinAbundanceTrainer:
         self.net_name = self.train_settings['net_name']
         self.params_path = '../trained/{}'.format(self.net_name)
         self.log_path = '{}/{}_log.txt'.format(self.params_path, self.net_name)
+        self.databases_alphs_path = '{}/{}_databases_alphs.json'.format(self.params_path, self.net_name)
+        self.model_config_path = '{}/{}_config.json'.format(self.params_path, self.net_name)
         self.logger = TrainLogger(self.log_path)
         self.data_loader = DataLoader(config_path)
         self.data_loader.loadTissue29data2genes(
@@ -250,10 +253,12 @@ class ProteinAbundanceTrainer:
         data, labels = self.data_loader.data(isdebug)
         data_cnt = len(labels)
         data2val_cnt = roundUp(data_cnt/5)
-        max_label = np.max(labels)
+        max_label = mx.nd.array(labels).max().asscalar()
         norm_labels = [float(x/max_label) for x in labels]
         data2train = mx.gluon.data.dataset.ArrayDataset(data[data2val_cnt:], norm_labels[data2val_cnt:])
         data2val = mx.gluon.data.dataset.ArrayDataset(data[:data2val_cnt], norm_labels[:data2val_cnt])
+        # data2train = mx.gluon.data.dataset.ArrayDataset(data[data2val_cnt:], labels[data2val_cnt:])
+        # data2val = mx.gluon.data.dataset.ArrayDataset(data[:data2val_cnt], labels[:data2val_cnt])
         batch_size = 32
         if isdebug:
             batch_size = 3
@@ -266,14 +271,32 @@ class ProteinAbundanceTrainer:
         L = mx.gluon.loss.L2Loss()
         num_batch = roundUp(len(labels)/batch_size)
         train_metric = mx.metric.MSE()
-        train_denorm_metric = mx.metric.MSE()
         val_metric = mx.metric.MSE()
-        val_denorm_metric = mx.metric.MSE()
+        train_denorm_metric = mx.metric.RMSE()
+        val_denorm_metric = mx.metric.RMSE()
         best_epoch = 0
         min_val_error = None
         first_forward = True
-        # for k,v in self.data_loader.databases_aplhs.items():
-            # print(k,v)
+        with open(self.databases_alphs_path, 'w') as f:
+            json.dump(self.data_loader.databases_alphs, f, indent=4)
+            print('databases info written', self.databases_alphs_path)
+        for data, labels in train_loader:
+            inference_shape = data.shape
+            self.logger.print('batch shape::{}'.format(inference_shape))
+            break
+        rna_exps_alphabet = self.data_loader.rnaMeasurementsAlphabet()
+        protein_exps_alphabet = self.data_loader.proteinMeasurementsAlphabet()
+        config_data = {
+            'net_name': self.net_name,
+            'inference_shape': inference_shape,
+            'denorm_max_label': float(max_label),
+            'rna_exps_alphabet': rna_exps_alphabet,
+            'protein_exps_alphabet': protein_exps_alphabet,
+            'databases': databases,
+        }
+        with open(self.model_config_path, 'w') as f:
+            json.dump(config_data, f, indent=4)
+            print('config info written', self.model_config_path)
         for i in range(1, self.epochs):
             # labels, shuffle_indxs = shuffle(labels)
             # data = setindxs(data, shuffle_indxs)
@@ -284,10 +307,9 @@ class ProteinAbundanceTrainer:
             val_denorm_metric.reset()
             train_loss = 0
             passed = 0
-            while passed < data_cnt:
+            while passed < len(data2train):
                 for data, labels in train_loader:
                     if first_forward:
-                        self.logger.print('batch shape::{}'.format(data.shape))
                         first_forward = False
                     ctx_data = data.as_in_context(self.ctx[0]).astype('float32')
                     with mx.autograd.record():
@@ -299,10 +321,37 @@ class ProteinAbundanceTrainer:
                         loss.backward()
                         passed += len(out)
                     trainer.step(len(data))
-                    train_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
+                    train_loss += sum([l.mean().asscalar()*max_label for l in loss]) / len(loss)
                     train_metric.update(labels, out)
+                    # for m in range(len(labels)):
+                    #     debug(labels[m])
+                    #     debug(out[m])
+                    #     debug(labels[m]*max_label)
+                    #     debug(out[m]*max_label)
+                    #     debug(denorm_shifted_log(labels[m]*max_label))
+                    #     print('denorm_shifted_log(out[m]*max_label)')
+                    #     debug(denorm_shifted_log(out[m]*max_label))
+                    # exit(0)
                     denorm_labels = mx.nd.array([denorm_shifted_log(x.asscalar()*max_label) for x in labels])
                     denorm_out = mx.nd.array([denorm_shifted_log(x.asscalar()*max_label) for x in out])
+                    # for d in range(len(data)):
+                    #     print('=========')
+                    #     met = mx.metric.MSE()
+                    #     rna_exp_id = int(data[d][1].mean().asscalar())
+                    #     prot_exp_id = int(data[d][2].mean().asscalar())
+                    #     rna_exp = rna_exps_alphabet[rna_exp_id]
+                    #     prot_exp = protein_exps_alphabet[prot_exp_id]
+                    #     debug(rna_exp_id)
+                    #     debug(prot_exp_id)
+                    #     debug(rna_exp)
+                    #     debug(prot_exp)
+                    #     debug(out[d])
+                    #     debug(denorm_out[d])
+                    #     debug(labels[d])
+                    #     debug(denorm_labels[d])
+                    #     met.update(denorm_labels[d], denorm_out[d])
+                    #     debug(met.get()[1])
+                    # exit(0)
                     train_denorm_metric.update(denorm_labels, denorm_out)
             for data, labels in val_loader:
                 ctx_data = data.as_in_context(self.ctx[0]).astype('float32')
@@ -315,6 +364,8 @@ class ProteinAbundanceTrainer:
             _, val_denorm_acc = val_denorm_metric.get()
             _, train_acc = train_metric.get()
             _, val_acc = val_metric.get()
+            train_acc *= max_label
+            val_acc *= max_label
             new_best_val = False
             if not min_val_error:
                 min_val_error = val_acc
@@ -327,9 +378,9 @@ class ProteinAbundanceTrainer:
             epoch_time = time.time() - tic
             msg = '[Epoch::{:03d}] time::{:.1f} \n'\
                   '| (val)::MSE_metric::{:.8f} \n'\
-                  '| (val)::MSE_denorm_metric::{:.8f} \n'\
+                  '| (val)::RMSE_denorm_metric::{:.8f} \n'\
                   '| (train)::MSE_metric::{:.8f} \n'\
-                  '| (train)::MSE_denorm_metric::{:.8f} \n'\
+                  '| (train)::RMSE_denorm_metric::{:.8f} \n'\
                   '| (train)::MES_loss::{:.8f}'.format(
                   i, 
                   epoch_time,
@@ -340,7 +391,7 @@ class ProteinAbundanceTrainer:
                   train_loss
             )
             self.logger.print(msg)
-            if not i % 10 or (i > 30 and new_best_val):
+            if not i % 10 or (i > 20 and new_best_val):
                 if new_best_val:
                     self.logger.print('new best val')
                 if not isdebug:

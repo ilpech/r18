@@ -127,7 +127,7 @@ class DataLoader:
             self.ion_path = opt['ionData']
             self.gene_mapping_path = opt['geneMapping']
         self.genes_mapping_databases = uniprot_mapping_header()
-        self.databases_aplhs = {}
+        self.databases_alphs = {}
         print('reading rna ', self.rna_path)
         self.rna_data = readSearchXlsxReport(
             self.rna_path,
@@ -361,7 +361,7 @@ class DataLoader:
                 if len(found) > 0:
                     npa[i][j] = 1
         print('mappingDatabase2oneHot::{}::found shape {}'.format(db_name, npa.shape))
-        return npa, uniq_data
+        return npa, sorted_uniq
 
     def sequencesAnalys(self):
         max_seq = None
@@ -392,7 +392,7 @@ class DataLoader:
         max_db_alph = 0
         for x in databases:
             mtrx, alph = self.mappingDatabase2matrix(x)
-            self.databases_aplhs[x] = alph
+            self.databases_alphs[x] = alph
             if not mtrx.shape[1]:
                 continue
             l_alph = roundUp(len(alph)/20)
