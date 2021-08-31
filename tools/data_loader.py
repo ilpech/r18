@@ -105,8 +105,9 @@ class DataLoader:
         with open(config_path) as c:
             return yaml.load(c)['data']
     
-    def __init__(self, config_path):
+    def __init__(self, config_path, only_genes_with_value=True):
         self.config_path = config_path
+        self.only_genes_with_value = only_genes_with_value
         if len(self.config_path) == 0:
             opt = self._get_argparse()
             self.prot1D_path = opt.prot1D
@@ -157,7 +158,7 @@ class DataLoader:
             try:
                 gene = Gene(
                     gene_id,
-                    only_w_values=True
+                    only_w_values=self.only_genes_with_value
                 )
                 gene.addRNAReport(self.rna_data)
                 gene.addProteinAbundanceReport(
@@ -211,12 +212,9 @@ class DataLoader:
         databases_gene_data,
         databases2use,
         max_db_data,
-        max_measures=None,
         rna_exps_alphabet=None,
         protein_exps_alphabet=None
     ):
-        if not max_measures:
-            max_measures = self.maxRnaMeasurementsInData()
         if not rna_exps_alphabet:
             rna_exps_alphabet = self.rnaMeasurementsAlphabet()
         if not protein_exps_alphabet:
@@ -286,12 +284,12 @@ class DataLoader:
                     len_filled = databases_gene_data[k].shape[0]
                     gene_experiments_batches[last_filled][id2fill][:len_filled] = databases_gene_data[k]
                 last_filled += 1
-        gene_experiments_batches = [x for x in gene_experiments_batches if x is not None]
+        gene_experiments_batches = np.array([x for x in gene_experiments_batches if x is not None])
         if not len(gene_experiments_batches):
             return None 
         print(
             'created batch {} for gene {}. last_layer_id_filled={}'.format(  
-                np.array(gene_experiments_batches).shape,
+                gene_experiments_batches.shape,
                 gene.id(),
                 last_filled
             ) 
@@ -375,7 +373,6 @@ class DataLoader:
     def data(self, isdebug=False):
         db_lim_ifdebug = 3
         lim_ifdebug = 100
-        max_measures = self.maxRnaMeasurementsInData()
         rna_exps_alphabet = self.rnaMeasurementsAlphabet()
         protein_exps_alphabet = self.proteinMeasurementsAlphabet()
         gene_exp_data2train = []
@@ -407,11 +404,10 @@ class DataLoader:
                 all_databases_gene_data,
                 databases2use,
                 max_db_alph,
-                max_measures,
                 rna_exps_alphabet,
                 protein_exps_alphabet
             )
-            if o:
+            if len(o):
                 genes_exps_batches.append(o)
         data = []
         labels = []
@@ -665,7 +661,6 @@ if __name__ == '__main__':
     #         gene.id_uniprot, 
     #         all_databases_gene_data,
     #         databases2use,
-    #         max_measures
     #     )
     #     debug(len(gene_batch_exps))
     #     debug(gene_batch_exps[0].shape)
