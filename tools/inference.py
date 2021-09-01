@@ -89,7 +89,8 @@ inference_shape = config['inference_shape']
 max_label = float(config['denorm_max_label'])
 prot_alph = config['protein_exps_alphabet']
 databases_alph = config['databases']
-writer_path = '{}/r18_tissue29_preds.tsv'.format(params_path)
+writer_path = '{}/r18_tissue29_preds_unknown.tsv'.format(params_path)
+out_path = '{}/r18_tissue29_preds_labels.txt'.format(params_path)
 alph_to_write = ['geneId_uniprot', 'geneId_Ensembl'] + prot_alph
 databases_data = []
 for x in databases_alph:
@@ -102,6 +103,7 @@ with open(writer_path, 'w', newline='') as f:
     writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     writer.writerow(alph_to_write)
     genes_size = len(data_loader.genes())
+    labels_outputs = []
     for j,gene in enumerate(data_loader.genes()):
         if j % 1000 == 0:
             print('{} of {}'.format(j, genes_size))
@@ -115,6 +117,9 @@ with open(writer_path, 'w', newline='') as f:
             rna_alph,
             prot_alph 
         )
+        if sample is None:
+            print('error getting sample for', uid)
+            continue
         # print('GENE::', uid)
         ens = data_loader.uniprot2ensg(uid)
         if not len(ens):
@@ -138,6 +143,7 @@ with open(writer_path, 'w', newline='') as f:
             prot_value = gene.protein_measurements[prot_expt]
             out = net(batch2inf)
             out_norm = denorm_shifted_log(out[0].asscalar()*max_label)
+            labels_outputs.append([uid, rna_expt, rna_value, prot_expt, prot_value, out_norm])
             measurements[prot_expt_id+2] = out_norm
             # debug(rna_expt)
             # debug(rna_value)
@@ -146,3 +152,12 @@ with open(writer_path, 'w', newline='') as f:
             # debug(out_norm)
         writer.writerow(measurements)
         print('=======================')
+    with open(out_path, 'w') as fv:
+        for lo in labels_outputs:
+            fv.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                lo[0],lo[1],
+                lo[2],lo[3],
+                lo[4],lo[5]
+            ))
+    print('data written to', out_path)
+    print('tsv written to', writer_path)
