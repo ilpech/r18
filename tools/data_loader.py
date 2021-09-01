@@ -47,8 +47,9 @@ from gene_mapping import (
     rewrite_mapping_with_ids
 )
 from uniprot_api import getGeneFromApi, sequence
-from typing import List
 from gene import Gene, GenesMapping
+
+from typing import List
 
 # isdebug = True
 isdebug = False

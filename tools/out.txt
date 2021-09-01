@@ -1,7 +1,0 @@
-reading rna  ../data/liver_hepg2/rna_liver_hepg2_13_20_no_header.xlsx
-readSearchGUIReport::reading data at:: /Users/ilpech/repositories/r18/data/liver_hepg2/rna_liver_hepg2_13_20_no_header.xlsx
-reading prot1D ../data/liver_hepg2/prot_1D_analysis.xlsx
-readSearchGUIReport::reading data at:: /Users/ilpech/repositories/r18/data/liver_hepg2/prot_1D_analysis.xlsx
-reading prot2D ../data/liver_hepg2/prot_2D_analysis.xlsx
-readSearchGUIReport::reading data at:: /Users/ilpech/repositories/r18/data/liver_hepg2/prot_2D_analysis.xlsx
-reading mapping ../data/liver_hepg2/human_18chr_tissue29_ids_mapping.tab

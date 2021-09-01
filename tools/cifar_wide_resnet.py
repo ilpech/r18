@@ -2,7 +2,7 @@ import os
 from mxnet.gluon.block import HybridBlock
 from mxnet.gluon import nn
 from mxnet import cpu
-from mxnet_dl.tools.tools import Softmax
+from tools import Softmax
 
 def _conv3x3(channels, stride, in_channels):
     return nn.Conv2D(channels, kernel_size=3, strides=stride, padding=1,
