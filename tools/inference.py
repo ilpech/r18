@@ -57,8 +57,10 @@ def load_exported(sym_path, params_path, ctx):
         )
 data_loader = DataLoader('../config/train.yaml')
 data_loader.loadTissue29data2genes(
-    '../data/liver_hepg2/tissue29.05k_rna.tsv',
-    '../data/liver_hepg2/tissue29.05k_prot.tsv',
+    '../data/liver_hepg2/tissue29.1k_rna.tsv',
+    '../data/liver_hepg2/tissue29.1k_prot.tsv',
+    # '../data/liver_hepg2/tissue29.05k_rna.tsv',
+    # '../data/liver_hepg2/tissue29.05k_prot.tsv',
     create_new_genes=True,
     isdebug=isdebug
 )
@@ -82,37 +84,38 @@ with open(db_conf_p, 'r') as f:
     db_config = json.load(f)
 net = load_exported(sym, params, ctx)
 net.hybridize()
-#(32, 10, 243, 20)
+#(b_size, 10, 243, 20)
 print('config', config_p)
 rna_alph = config['rna_exps_alphabet']
 inference_shape = config['inference_shape']
 max_label = float(config['denorm_max_label'])
 prot_alph = config['protein_exps_alphabet']
-databases_alph = config['databases']
-writer_path = '{}/r18_tissue29_preds_unknown.tsv'.format(params_path)
-out_path = '{}/r18_tissue29_preds_labels.txt'.format(params_path)
+databases_names_alph = config['databases']
+writer_path = '{}/r18_tissue29_preds_extended.tsv'.format(params_path)
+out_path = '{}/r18_tissue29_preds_labels_extended.txt'.format(params_path)
 alph_to_write = ['geneId_uniprot', 'geneId_Ensembl'] + prot_alph
 databases_data = []
-for x in databases_alph:
-    mtrx, alph = data_loader.mappingDatabase2matrix(x)
+for x in databases_names_alph:
+    mtrx, alph = data_loader.mappingDatabase2matrix(x, db_config[x])
     if not mtrx.shape[1]:
         continue
     databases_data.append(mtrx)
 print('writing to', writer_path)
+print('process...')
 with open(writer_path, 'w', newline='') as f:
     writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     writer.writerow(alph_to_write)
     genes_size = len(data_loader.genes())
     labels_outputs = []
     for j,gene in enumerate(data_loader.genes()):
-        if j % 1000 == 0:
-            print('{} of {}'.format(j, genes_size))
+        if j % 100 == 0:
+            print('gene {} of {}'.format(j, genes_size))
         uid = gene.id()
         all_databases_gene_data = [x[j] for x in databases_data]
         sample = data_loader.gene2sampleExperimentHasId(
             uid,
             all_databases_gene_data,
-            databases_alph,
+            databases_names_alph,
             inference_shape[2],
             rna_alph,
             prot_alph 
@@ -120,7 +123,6 @@ with open(writer_path, 'w', newline='') as f:
         if sample is None:
             print('error getting sample for', uid)
             continue
-        # print('GENE::', uid)
         ens = data_loader.uniprot2ensg(uid)
         if not len(ens):
             ens = ''
@@ -132,7 +134,6 @@ with open(writer_path, 'w', newline='') as f:
             if k >= len(sample):
                 continue
             b = sample[k]
-            # print('++++++++++')
             batch2inf = mx.nd.array(b, ctx=ctx)
             batch2inf = batch2inf.expand_dims(axis=0)
             rna_expt_id = int(batch2inf[0][1].mean().asscalar())
@@ -145,13 +146,7 @@ with open(writer_path, 'w', newline='') as f:
             out_norm = denorm_shifted_log(out[0].asscalar()*max_label)
             labels_outputs.append([uid, rna_expt, rna_value, prot_expt, prot_value, out_norm])
             measurements[prot_expt_id+2] = out_norm
-            # debug(rna_expt)
-            # debug(rna_value)
-            # debug(prot_expt)
-            # debug(prot_value)
-            # debug(out_norm)
         writer.writerow(measurements)
-        print('=======================')
     with open(out_path, 'w') as fv:
         for lo in labels_outputs:
             fv.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(

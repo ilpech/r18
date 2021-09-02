@@ -14,7 +14,6 @@ def getGeneFromApi(
         with open(out, 'r') as f:
             try:
                 out_from_log = json.load(f)
-                print('gene read from {}'.format(out))
                 return out_from_log
             except:
                 raise Exception('error reading {}'.format(out))

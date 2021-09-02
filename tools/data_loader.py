@@ -48,6 +48,7 @@ from gene_mapping import (
 )
 from uniprot_api import getGeneFromApi, sequence
 from gene import Gene, GenesMapping
+import csv
 
 from typing import List
 
@@ -228,8 +229,8 @@ class DataLoader:
                 (len(databases2use)+4), 
                 # 4 channels::
                 #   - channel full of rna expetiment value
-                #   - channel for rna experiment_id(?)
-                #   - channel for prot label experiment_id(?)
+                #   - channel for rna experiment_id
+                #   - channel for prot label experiment_id
                 #   - channel for amino acids sequence coding (...*20)
                 variable_length_layer_size,
                 int(DataLoader.magic_consts.protein_amino_acids_size)
@@ -241,7 +242,6 @@ class DataLoader:
         onehot_rows = gene_seq_onehot.shape[0]
         if onehot_rows > variable_length_layer_size:
            onehot_rows = variable_length_layer_size
-        api_seq = gene.apiSequence()
         last_filled = 0
         for i in range(rna_experiments_size):
             experiment = rna_exps_alphabet[i]
@@ -288,13 +288,14 @@ class DataLoader:
         gene_experiments_batches = np.array([x for x in gene_experiments_batches if x is not None])
         if not len(gene_experiments_batches):
             return None 
-        print(
-            'created batch {} for gene {}. last_layer_id_filled={}'.format(  
-                gene_experiments_batches.shape,
-                gene.id(),
-                last_filled
-            ) 
-        )
+        # !debug
+        # print(
+        #     'created batch {} for gene {}. last_layer_id_filled={}'.format(  
+        #         gene_experiments_batches.shape,
+        #         gene.id(),
+        #         last_filled
+        #     ) 
+        # )
         return gene_experiments_batches        
     
     def dataFromMappingDatabase(self, db_name, gene_name):
@@ -318,11 +319,19 @@ class DataLoader:
     def mappingDatabaseAplhabetSize(self, db_name):
         return len(self.mappingDatabaseAlphabet(db_name))
     
-    def mappingDatabase2matrix(self, db_name, cols=20):
+    def mappingDatabase2matrix(
+        self, 
+        db_name,
+        db_alphabet=None, 
+        cols=20
+    ):
         '''
         returns onehotmatrix, db_mapping_alphabet
         '''
-        onehot, alph = self.mappingDatabase2oneHot(db_name)
+        onehot, alph = self.mappingDatabase2oneHot(
+            db_name, 
+            db_alphabet
+        )
         uniq_size = roundUp(onehot.shape[1]/float(cols))
         reshape = np.zeros((onehot.shape[0], uniq_size, cols)).flatten()
         for gene_id in range(len(onehot)):
@@ -334,19 +343,25 @@ class DataLoader:
     def mappingDatabase2oneHot(
         self, 
         db_name,
+        db_alphabet=None,
         outpath='../data/mapping_out'
     ):
         '''
         returns onehotvector, db_mapping_alphabet
         '''
         genes_data = []
-        uniq_data = []
-        for i in range(len(self.genes())):
-            db_gene_data = self.dataFromMappingDatabase(db_name, self.genes()[i].id_uniprot)
-            genes_data.append(db_gene_data)
-            for data in db_gene_data:
-                if data not in uniq_data:
-                    uniq_data.append(data) 
+        uniq_data = db_alphabet
+        if uniq_data is None:
+            uniq_data = []
+            for i in range(len(self.genes())):
+                db_gene_data = self.dataFromMappingDatabase(
+                    db_name, 
+                    self.genes()[i].id_uniprot
+                )
+                genes_data.append(db_gene_data)
+                for data in db_gene_data:
+                    if data not in uniq_data:
+                        uniq_data.append(data) 
         npa = np.zeros(shape=(len(self.genes()), len(uniq_data)))
         sorted_uniq = sorted(uniq_data)
         for i in range(len(genes_data)):
@@ -499,24 +514,6 @@ class DataLoader:
         create_new_genes=True,
         isdebug=False
     ):
-        
-        class Tissue29Data:
-            def __init__(
-                self,
-                uniprot_id,
-                ensg_id,
-                experiments = {}
-            ):
-                self.uniprot_id = uniprot_id
-                self.ensg_id = ensg_id
-                self.experiments = experiments
-        print(
-            'loading tissue29 data...\ngenes now {}\ncreate_new_genes={}'.format(       
-                len(self.genes()), 
-                create_new_genes
-            ) 
-        )
-        import csv
         rna_tissues = []
         prot_tissues = []
         rna_header = []
@@ -612,63 +609,14 @@ if __name__ == '__main__':
     # )
     # exit()
     dataloader = DataLoader('../config/train.yaml')
-    # dataloader.loadTissue29data2genes(
-    #     '../data/liver_hepg2/tissue29_rna.tsv',
-    #     '../data/liver_hepg2/tissue29_prot.tsv',
-    #     create_new_genes=True,
-    #     isdebug=isdebug
-    # )
-    # exit(0)
-    # # gi_onehot = dataloader.mappingDatabase2oneHot('GI')
-    # # go_onehot = dataloader.mappingDatabase2oneHot('GO')
-    # # pubmed_onehot = dataloader.mappingDatabase2oneHot('PubMed')
-    # # mim_onehot = dataloader.mappingDatabase2oneHot('MIM')
-    # # refseq_onehot = dataloader.mappingDatabase2oneHot('RefSeq')
-    # # ensembl_onehot = dataloader.mappingDatabase2oneHot('Ensembl')
-    # max_measures=dataloader.maxRnaMeasurementsInData()
+    dataloader.loadTissue29data2genes(
+        '../data/liver_hepg2/tissue29.05k_rna.tsv',
+        '../data/liver_hepg2/tissue29.05k_prot.tsv',
+        create_new_genes=True,
+        isdebug=isdebug
+    )
+    
     databases = uniq_nonempty_uniprot_mapping_header()
-    # ensg_id = dataloader.uniprot2ensg(dataloader.genes[0].id())
-    # # print(ensg_id)
-    # exit()
-    # for x in databases:
-    #     print(x, dataloader.genes[0].id())
-    #     data = dataloader.uniprot2db(dataloader.genes[0].id(), x)
-    #     print(data)
-    # exit(0)
-    # databases_data = []
-    # databases2use =[]
-    # a1 = [x.protein_copies_per_cell_1D for x in dataloader.genes if is_number(x.protein_copies_per_cell_1D) and x.protein_copies_per_cell_1D > 0]
-    # a2 = [x.protein_copies_per_cell_2D for x in dataloader.genes if is_number(x.protein_copies_per_cell_2D) and x.protein_copies_per_cell_2D > 0]
-    # print('1d')
-    # for a in a1:
-    #     print(a)
-    # print('2d')
-    # for a in a1:
-    #     print(a)
-    # print('good prots 1d', len(a1))
-    # print('good prots 2d', len(a2))
-    # exit(0)
-    # for x in databases:
-    #     mtrx = dataloader.mappingDatabase2matrix(x)
-    #     if not mtrx.shape[1]:
-    #         continue
-    #     databases_data.append(mtrx)
-    #     databases2use.append(x)
-    # # exit(0)
-    # for i,gene in enumerate(dataloader.genes):
-    #     all_databases_gene_data = [x[i] for x in databases_data]
-    #     print('gene {} of {}'.format(i, len(dataloader.genes)))
-    #     gene_batch_exps = dataloader.gene2sampleExperimentHasId(
-    #         gene.id_uniprot, 
-    #         all_databases_gene_data,
-    #         databases2use,
-    #     )
-    #     debug(len(gene_batch_exps))
-    #     debug(gene_batch_exps[0].shape)
-    #     exit(0)
-    # max_shape = 0
-    # max_shape_orig = (0,0)
-    # max_shape_name = ''
     for db_name in databases:
         onehot_m, alph = dataloader.mappingDatabase2matrix(db_name)
         shape_s = onehot_m.flatten().shape[0]
