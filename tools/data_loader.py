@@ -182,6 +182,16 @@ class DataLoader:
            raise Exception('gene::gene {} not found'.format(upirot_gene_id))
         return self.genes()[gene_ids[0]], gene_ids[0]
     
+    def rnaExperimentsCount(self):
+        return sum([
+            len(x.rna_measurements) for x in self.genes()
+        ])
+        
+    def proteinExperimentsCount(self):
+        return sum([
+            len(x.protein_measurements) for x in self.genes()
+        ])
+    
     def rnaMeasurementsAlphabet(self):
         out = []
         for g in self.genes():
@@ -602,6 +612,8 @@ class DataLoader:
         
         print('{} good genes experiments added'.format(good_data))
         print('{} genes now'.format(len(self.genes())))
+        print('{} rna experiments in data'.format(self.rnaExperimentsCount()))
+        print('{} protein experiments in data'.format(self.proteinExperimentsCount()))
 
 if __name__ == '__main__':
     # DataLoader.ensg2uniprot(
@@ -610,12 +622,15 @@ if __name__ == '__main__':
     # exit()
     dataloader = DataLoader('../config/train.yaml')
     dataloader.loadTissue29data2genes(
-        '../data/liver_hepg2/tissue29.05k_rna.tsv',
-        '../data/liver_hepg2/tissue29.05k_prot.tsv',
+        '../data/liver_hepg2/tissue29_rna.tsv',
+        '../data/liver_hepg2/tissue29_prot.tsv',
+        # '../data/liver_hepg2/tissue29.1k_rna.tsv',
+        # '../data/liver_hepg2/tissue29.1k_prot.tsv',
+        # '../data/liver_hepg2/tissue29.05k_rna.tsv',
+        # '../data/liver_hepg2/tissue29.05k_prot.tsv',
         create_new_genes=True,
         isdebug=isdebug
     )
-    
     databases = uniq_nonempty_uniprot_mapping_header()
     for db_name in databases:
         onehot_m, alph = dataloader.mappingDatabase2matrix(db_name)

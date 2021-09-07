@@ -34,7 +34,8 @@ import csv
 
 # isdebug = True
 isdebug = False
-metric_file = '../trained/2export/resnet_regressor.007/r18_tissue29_preds_labels.txt'
+# metric_file = '../trained/2export/resnet_regressor.007/r18_tissue29_preds_labels.txt'
+metric_file = '../trained/2export/resnet_regressor.007/r18_tissue29_preds_labels_extended.txt'
 uids = []
 rna_exps = []
 rna_values = []
@@ -57,11 +58,11 @@ print('{} experiments read'.format(len(labels)))
 labels = mx.nd.array(labels)
 preds = mx.nd.array(preds)
 metric = mx.metric.PearsonCorrelation()
-exp_metric = mx.metric.PearsonCorrelation()
 print('=============')
 print('experiments metrics(PearsonCorrelation)::')
 exps_metrics = []
 for exp in prot_exps_alph:
+    exp_metric = mx.metric.PearsonCorrelation()
     ids2use = [i for i in range(len(labels)) if prot_exps[i] == exp]
     exp_labels = mx.nd.array([labels[i].asscalar() for i in range(len(labels)) if i in ids2use])
     exp_preds = mx.nd.array([preds[i].asscalar() for i in range(len(preds)) if i in ids2use])

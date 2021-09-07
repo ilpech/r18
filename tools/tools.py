@@ -25,6 +25,14 @@ def listfind(set_, subset_):
         [x for x in set_ if x in subset_]
     )
     
+def net_summary(
+        net, 
+        inp_size
+    ):
+        mx.viz.print_summary(
+            net(mx.sym.var('data')), 
+            shape={'data':inp_size}
+        )
 
 def list2nonEmptyIds(l):
     return [j for j in range(len(l)) if l[j]]
